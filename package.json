@@ -1,0 +1,45 @@
+{
+  "name": "e2ee-messenger",
+  "version": "1.0.0",
+  "description": "Privacy-first E2EE messenger monorepo",
+  "private": true,
+  "workspaces": [
+    "app",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\"",
+    "dev:server": "cd server && go run main.go",
+    "dev:app": "cd app && npm start",
+    "build": "npm run build:server && npm run build:app",
+    "build:server": "cd server && go build -o bin/server main.go",
+    "build:app": "cd app && npm run build",
+    "test": "npm run test:server && npm run test:app",
+    "test:server": "cd server && go test ./...",
+    "test:app": "cd app && npm test",
+    "lint": "npm run lint:server && npm run lint:app",
+    "lint:server": "cd server && golangci-lint run",
+    "lint:app": "cd app && npm run lint",
+    "format": "npm run format:server && npm run format:app",
+    "format:server": "cd server && go fmt ./...",
+    "format:app": "cd app && npm run format",
+    "setup": "npm install && cd app && npm install && cd ../server && go mod tidy",
+    "infra:up": "docker-compose up -d",
+    "infra:down": "docker-compose down",
+    "infra:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
