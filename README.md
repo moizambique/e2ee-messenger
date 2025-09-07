@@ -1,4 +1,9 @@
-# E2EE Messenger
+# 🔐 E2EE Messenger
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-blue.svg)](https://golang.org/)
+[![React Native](https://img.shields.io/badge/React%20Native-0.73+-61DAFB.svg)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6.svg)](https://www.typescriptlang.org/)
 
 A production-ready, privacy-first end-to-end encrypted messaging application built with React Native (Expo) and Go.
 
@@ -66,6 +71,18 @@ e2ee-messenger/
 - **Database Admin**: Adminer
 - **Development**: Makefile for common tasks
 
+## 🎥 Demo
+
+[![Demo Video](https://img.shields.io/badge/Demo-Video-red.svg)](#) <!-- Add your demo video link here -->
+
+### Live Demo Features
+- ✅ **User Authentication** - Signup/Login with JWT
+- ✅ **Real-time Messaging** - Live chat with WebSocket
+- ✅ **Contact Management** - Add and manage contacts
+- ✅ **Key Verification** - Signal-style safety numbers
+- ✅ **Modern UI** - iOS-style interface
+- ✅ **Cross-platform** - iOS, Android, Web
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -76,9 +93,9 @@ e2ee-messenger/
 
 ### 1. Clone and Setup
 ```bash
-git clone <repository-url>
+git clone https://github.com/YOUR_USERNAME/e2ee-messenger.git
 cd e2ee-messenger
-make setup
+npm run setup
 ```
 
 ### 2. Start Infrastructure
@@ -323,20 +340,45 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🤝 Contributing
 
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
+5. Run the test suite (`npm run test`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## 📊 Project Stats
+
+![GitHub stars](https://img.shields.io/github/stars/YOUR_USERNAME/e2ee-messenger?style=social)
+![GitHub forks](https://img.shields.io/github/forks/YOUR_USERNAME/e2ee-messenger?style=social)
+![GitHub issues](https://img.shields.io/github/issues/YOUR_USERNAME/e2ee-messenger)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/YOUR_USERNAME/e2ee-messenger)
 
 ## 📞 Support
 
 For questions and support:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the API documentation
+- 📖 [Documentation](SETUP.md)
+- 🐛 [Report Issues](https://github.com/YOUR_USERNAME/e2ee-messenger/issues)
+- 💬 [Discussions](https://github.com/YOUR_USERNAME/e2ee-messenger/discussions)
+- 📧 [Contact](mailto:your-email@example.com)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Signal Protocol](https://signal.org/docs/) for encryption inspiration
+- [React Native](https://reactnative.dev/) for cross-platform development
+- [Expo](https://expo.dev/) for development tools
+- [Go](https://golang.org/) for backend performance
 
 ---
 
 **⚠️ Security Notice**: This is a demonstration project. For production use, implement proper crypto libraries and security practices as outlined in the caveats section.
+
+**⭐ Star this repository if you found it helpful!**
