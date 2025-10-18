@@ -33,7 +33,7 @@ npm run infra:up
 
 This will start:
 - PostgreSQL database on `localhost:5432`
-- Adminer (database admin) on `http://localhost:8081`
+- Adminer (database admin) on `http://localhost:8088`
 
 ### 3. Seed Database (Optional)
 

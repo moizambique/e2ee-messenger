@@ -24,9 +24,9 @@
     "format:server": "cd server && go fmt ./...",
     "format:app": "cd app && npm run format",
     "setup": "npm install && cd app && npm install && cd ../server && go mod tidy",
-    "infra:up": "docker-compose up -d",
-    "infra:down": "docker-compose down",
-    "infra:logs": "docker-compose logs -f"
+    "infra:up": "docker-compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker-compose -f infra/docker-compose.yml down",
+    "infra:logs": "docker-compose -f infra/docker-compose.yml logs -f"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

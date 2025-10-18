@@ -17,8 +17,8 @@ npm run dev
 ### 2. Access Points
 
 - **Mobile App**: Scan QR code with Expo Go app
-- **Web App**: Open `http://localhost:19006` in browser
-- **Database Admin**: `http://localhost:8081` (Adminer)
+- **Web App**: Open `http://localhost:8081` in browser (or as specified by Expo)
+- **Database Admin**: `http://localhost:8088` (Adminer)
 - **API Server**: `http://localhost:8080`
 
 ## Demo Flow
