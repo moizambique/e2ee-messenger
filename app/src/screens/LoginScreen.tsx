@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,12 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Login Failed', error, [{ text: 'OK', onPress: clearError }]);
+    }
+  }, [error]);
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -36,7 +42,7 @@ const LoginScreen: React.FC = () => {
     try {
       clearError();
       await login(email.trim(), password);
-    } catch (error) {
+    } catch (e) {
       // Error is handled by the auth store
     }
   };

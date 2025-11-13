@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,12 @@ const SignupScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Signup Failed', error, [{ text: 'OK', onPress: clearError }]);
+    }
+  }, [error]);
+
   const handleSignup = async () => {
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -49,7 +55,7 @@ const SignupScreen: React.FC = () => {
     try {
       clearError();
       await signup(username.trim(), email.trim(), password);
-    } catch (error) {
+    } catch (e) {
       // Error is handled by the auth store
     }
   };

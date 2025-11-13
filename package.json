@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\"",
     "dev:server": "cd server && go run main.go",
-    "dev:app": "cd app && npm start",
+    "dev:app": "cd app && npm run web -- --clear",
     "build": "npm run build:server && npm run build:app",
     "build:server": "cd server && go build -o bin/server main.go",
     "build:app": "cd app && npm run build",

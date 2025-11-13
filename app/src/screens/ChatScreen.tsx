@@ -72,7 +72,7 @@ const ChatScreen: React.FC = () => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isOwn = item.sender_id === user?.id;
+    const isOwn = item.senderId === user?.id;
     
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
