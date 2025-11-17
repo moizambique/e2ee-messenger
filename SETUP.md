@@ -51,7 +51,7 @@ npm run dev
 
 This will start:
 - Go server on `http://localhost:8080`
-- React Native app (Expo)
+- React Native app (Expo) on 'http://localhost:19006'
 
 ### 5. Run the App
 

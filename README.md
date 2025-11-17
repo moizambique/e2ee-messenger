@@ -31,6 +31,7 @@ e2ee-messenger/
 │   │   ├── crypto/         # E2EE crypto module
 │   │   ├── types/          # TypeScript type definitions
 │   │   └── utils/          # Utility functions
+│   └── webpack.config.js # Webpack config for browser polyfills
 ├── server/                 # Go backend server
 │   ├── internal/
 │   │   ├── config/         # Configuration management
@@ -41,9 +42,8 @@ e2ee-messenger/
 │   │   └── websocket/      # WebSocket hub and client
 │   └── scripts/            # Database seed scripts
 ├── infra/                  # Infrastructure configuration
-│   ├── docker-compose.yml  # PostgreSQL and Adminer
-│   └── init.sql           # Database initialization
-└── Makefile               # Development commands
+│   └── docker-compose.yml  # PostgreSQL and Adminer
+└── package.json           # Monorepo scripts
 ```
 
 ## 🛠️ Tech Stack
