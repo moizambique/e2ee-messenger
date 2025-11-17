@@ -29,31 +29,28 @@ const SignupScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  useEffect(() => {
-    if (error) {
-      Alert.alert('Signup Failed', error, [{ text: 'OK', onPress: clearError }]);
-    }
-  }, [error]);
+  const [clientError, setClientError] = useState<string | null>(null);
 
   const handleSignup = async () => {
+    clearError();
+    setClientError(null);
+
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setClientError('Please fill in all fields');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      setClientError('Passwords do not match');
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters long');
+      setClientError('Password must be at least 8 characters long');
       return;
     }
 
     try {
-      clearError();
       await signup(username.trim(), email.trim(), password);
     } catch (e) {
       // Error is handled by the auth store
@@ -152,10 +149,10 @@ const SignupScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {error && (
+          {(error || clientError) && (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle-outline" size={16} color="#FF3B30" />
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>{error || clientError}</Text>
             </View>
           )}
 

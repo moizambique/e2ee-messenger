@@ -35,11 +35,18 @@ func New(db *database.DB, hub *websocket.Hub, cfg *config.Config) *Handlers {
 	}
 }
 
+// respondWithError is a helper to send a JSON error response.
+func respondWithError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"message": message})
+}
+
 // Signup handles user registration
 func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	var req models.SignupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -47,7 +54,7 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	var existingUser models.User
 	err := h.db.QueryRow("SELECT id FROM users WHERE email = $1 OR username = $2", req.Email, req.Username).Scan(&existingUser.ID)
 	if err == nil {
-		http.Error(w, "User already exists", http.StatusConflict)
+		respondWithError(w, http.StatusConflict, "A user with this email or username already exists")
 		return
 	}
 
@@ -70,14 +77,14 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 	`, user.ID, user.Username, user.Email, user.Password, user.CreatedAt, user.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
 	// Generate JWT token
 	token, err := h.generateToken(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
@@ -95,7 +102,7 @@ func (h *Handlers) Signup(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -107,24 +114,24 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	`, req.Email).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		respondWithError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
 	// Verify password
 	if !verifyPassword(req.Password, user.Password) {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		respondWithError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
 	// Generate JWT token
 	token, err := h.generateToken(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
@@ -144,7 +151,7 @@ func (h *Handlers) UploadDeviceKey(w http.ResponseWriter, r *http.Request) {
 
 	var req models.DeviceKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -165,7 +172,7 @@ func (h *Handlers) UploadDeviceKey(w http.ResponseWriter, r *http.Request) {
 	`, deviceKey.ID, deviceKey.UserID, deviceKey.DeviceID, deviceKey.PublicKey, deviceKey.CreatedAt, deviceKey.UpdatedAt)
 
 	if err != nil {
-		http.Error(w, "Failed to upload device key", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to upload device key")
 		return
 	}
 
@@ -179,7 +186,7 @@ func (h *Handlers) UploadOneTimeKey(w http.ResponseWriter, r *http.Request) {
 
 	var req models.OneTimeKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -200,7 +207,7 @@ func (h *Handlers) UploadOneTimeKey(w http.ResponseWriter, r *http.Request) {
 	`, oneTimeKey.ID, oneTimeKey.UserID, oneTimeKey.KeyID, oneTimeKey.PublicKey, oneTimeKey.Used, oneTimeKey.CreatedAt)
 
 	if err != nil {
-		http.Error(w, "Failed to upload one-time key", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to upload one-time key")
 		return
 	}
 
@@ -212,13 +219,13 @@ func (h *Handlers) UploadOneTimeKey(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetBootstrapKeys(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	if userIDStr == "" {
-		http.Error(w, "user_id parameter required", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "user_id parameter required")
 		return
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		http.Error(w, "Invalid user_id format", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid user_id format")
 		return
 	}
 
@@ -228,7 +235,7 @@ func (h *Handlers) GetBootstrapKeys(w http.ResponseWriter, r *http.Request) {
 		FROM device_keys WHERE user_id = $1
 	`, userID)
 	if err != nil {
-		http.Error(w, "Failed to fetch device keys", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to fetch device keys")
 		return
 	}
 	defer deviceRows.Close()
@@ -238,7 +245,7 @@ func (h *Handlers) GetBootstrapKeys(w http.ResponseWriter, r *http.Request) {
 		var key models.DeviceKey
 		err := deviceRows.Scan(&key.ID, &key.UserID, &key.DeviceID, &key.PublicKey, &key.CreatedAt, &key.UpdatedAt)
 		if err != nil {
-			http.Error(w, "Failed to scan device key", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan device key")
 			return
 		}
 		deviceKeys = append(deviceKeys, key)
@@ -251,7 +258,7 @@ func (h *Handlers) GetBootstrapKeys(w http.ResponseWriter, r *http.Request) {
 		ORDER BY created_at ASC LIMIT 10
 	`, userID)
 	if err != nil {
-		http.Error(w, "Failed to fetch one-time keys", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to fetch one-time keys")
 		return
 	}
 	defer oneTimeRows.Close()
@@ -261,7 +268,7 @@ func (h *Handlers) GetBootstrapKeys(w http.ResponseWriter, r *http.Request) {
 		var key models.OneTimeKey
 		err := oneTimeRows.Scan(&key.ID, &key.UserID, &key.KeyID, &key.PublicKey, &key.Used, &key.CreatedAt)
 		if err != nil {
-			http.Error(w, "Failed to scan one-time key", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan one-time key")
 			return
 		}
 		oneTimeKeys = append(oneTimeKeys, key)
@@ -282,13 +289,13 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	recipientID, err := uuid.Parse(req.RecipientID)
 	if err != nil {
-		http.Error(w, "Invalid recipient_id format", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
 		return
 	}
 
@@ -307,7 +314,7 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	`, message.ID, message.SenderID, message.RecipientID, message.EncryptedContent, message.MessageType, message.CreatedAt)
 
 	if err != nil {
-		http.Error(w, "Failed to send message", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to send message")
 		return
 	}
 
@@ -335,13 +342,13 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	recipientIDStr := r.URL.Query().Get("recipient_id")
 	if recipientIDStr == "" {
-		http.Error(w, "recipient_id parameter required", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "recipient_id parameter required")
 		return
 	}
 
 	recipientID, err := uuid.Parse(recipientIDStr)
 	if err != nil {
-		http.Error(w, "Invalid recipient_id format", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
 		return
 	}
 
@@ -381,7 +388,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to fetch messages")
 		return
 	}
 	defer rows.Close()
@@ -391,7 +398,7 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 		var message models.Message
 		err := rows.Scan(&message.ID, &message.SenderID, &message.RecipientID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
 		if err != nil {
-			http.Error(w, "Failed to scan message", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan message")
 			return
 		}
 		messages = append(messages, message)
@@ -407,13 +414,13 @@ func (h *Handlers) SendReceipt(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SendReceiptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	messageID, err := uuid.Parse(req.MessageID)
 	if err != nil {
-		http.Error(w, "Invalid message_id format", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Invalid message_id format")
 		return
 	}
 
@@ -432,7 +439,7 @@ func (h *Handlers) SendReceipt(w http.ResponseWriter, r *http.Request) {
 	`, receipt.ID, receipt.MessageID, receipt.UserID, receipt.Type, receipt.CreatedAt)
 
 	if err != nil {
-		http.Error(w, "Failed to send receipt", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to send receipt")
 		return
 	}
 

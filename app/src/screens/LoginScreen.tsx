@@ -26,21 +26,17 @@ const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (error) {
-      Alert.alert('Login Failed', error, [{ text: 'OK', onPress: clearError }]);
-    }
-  }, [error]);
+  const [clientError, setClientError] = useState<string | null>(null);
 
   const handleLogin = async () => {
+    clearError();
+    setClientError(null);
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setClientError('Please fill in all fields');
       return;
     }
 
     try {
-      clearError();
       await login(email.trim(), password);
     } catch (e) {
       // Error is handled by the auth store
@@ -102,10 +98,10 @@ const LoginScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {error && (
+          {(error || clientError) && (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle-outline" size={16} color="#FF3B30" />
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>{error || clientError}</Text>
             </View>
           )}
 
