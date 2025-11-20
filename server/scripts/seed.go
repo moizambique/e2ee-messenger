@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -11,7 +10,15 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/argon2"
 )
+
+func hashPassword(password string) string {
+	// Using Argon2id for password hashing
+	salt := []byte("random-salt-change-in-production") // In production, use random salt per user
+	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	return fmt.Sprintf("%x", hash)
+}
 
 func main() {
 	// Connect to database
@@ -27,7 +34,7 @@ func main() {
 			ID:        uuid.New(),
 			Username:  "alice",
 			Email:     "alice@example.com",
-			Password:  "hashed_password_alice", // In production, use proper hashing
+			Password:  hashPassword("password123"),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
@@ -35,7 +42,7 @@ func main() {
 			ID:        uuid.New(),
 			Username:  "bob",
 			Email:     "bob@example.com",
-			Password:  "hashed_password_bob", // In production, use proper hashing
+			Password:  hashPassword("password123"),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		},
