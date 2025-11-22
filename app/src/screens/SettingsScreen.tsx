@@ -1,102 +1,107 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert as RNAlert,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../store/AuthContext';
+import CustomAlert from './CustomAlert';
+import { RootStackParamList } from '../types';
+
+type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<SettingsScreenNavigationProp>();
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', buttons: [] as any[] });
+
+  const showAlert = (title: string, message: string, buttons: any[]) => {
+    setAlertConfig({ title, message, buttons });
+    setAlertVisible(true);
+  };
 
   const handleLogout = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to logout?')) {
-        logout();
-      }
-    } else {
-      RNAlert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Logout', 
-            style: 'destructive',
-            onPress: logout
-          },
-        ]
-      );
-    }
+    showAlert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel', onPress: () => {} },
+      { text: 'Logout', style: 'destructive', onPress: logout },
+    ]);
   };
 
   const handleProfile = () => {
-    const message = 'Profile editing will be available in a future update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    // This will navigate to a new screen we will create
+    showAlert('Coming Soon', 'Profile editing will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handleDeviceKeys = () => {
-    const message = 'Device key management will be available in a future update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    // This will navigate to a new screen we will create
+    showAlert('Coming Soon', 'Device key management will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handleDeleteAccount = () => {
-    const confirmationMessage = 'This is a destructive action and cannot be undone. Are you sure you want to permanently delete your account?';
-    const comingSoonMessage = 'Account deletion will be implemented soon.';
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(confirmationMessage)) {
-        window.alert(comingSoonMessage);
-      }
-    } else {
-      RNAlert.alert(
-        'Delete Account',
-        confirmationMessage,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => RNAlert.alert('Coming Soon', comingSoonMessage) },
-        ]
-      );
-    }
+    showAlert(
+      'Delete Account',
+      'This is a destructive action and cannot be undone. Are you sure you want to permanently delete your account?',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            showAlert('Coming Soon', 'Account deletion will be implemented soon.', [
+              { text: 'OK', onPress: () => {} },
+            ]);
+          },
+        },
+      ]
+    );
   };
 
   const handleHelpAndSupport = () => {
-    const message = 'The help and support section will be available in a future update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    showAlert('Coming Soon', 'The help and support section will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handleKeyVerification = () => {
-    const message = 'Key verification feature will be available in the next update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    // This will navigate to a new screen we will create
+    // For now, we'll keep the alert as a placeholder.
+    showAlert('Coming Soon', 'Key verification will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handleNotifications = () => {
-    const message = 'Notification settings will be available in the next update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    // This will navigate to a new screen we will create
+    showAlert('Coming Soon', 'Notification settings will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handlePrivacy = () => {
-    const message = 'Privacy settings will be available in the next update.';
-    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+    // This will navigate to a new screen we will create
+    showAlert('Coming Soon', 'Privacy settings will be available in a future update.', [
+      { text: 'OK', onPress: () => {} },
+    ]);
   };
 
   const handleAbout = () => {
-    const message = 'Version 1.0.0\n\nA privacy-first end-to-end encrypted messaging app built with React Native and Go.';
-    if (Platform.OS === 'web') {
-      window.alert(message);
-    } else {
-      RNAlert.alert(
-        'About E2EE Messenger',
-        message,
-        [{ text: 'OK' }]
-      );
-    }
+    showAlert(
+      'About E2EE Messenger',
+      'Version 1.0.0\n\nA privacy-first end-to-end encrypted messaging app built with React Native and Go.',
+      [{ text: 'OK', onPress: () => {} }]
+    );
   };
 
   const renderSettingItem = (
@@ -122,6 +127,13 @@ const SettingsScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
