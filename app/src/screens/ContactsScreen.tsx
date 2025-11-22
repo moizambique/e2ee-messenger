@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   TextInput,
-  Alert,
+  Alert as RNAlert,
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -67,7 +67,7 @@ const ContactsScreen: React.FC = () => {
       // For now, using mock data
       setContacts(mockContacts);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load contacts');
+      RNAlert.alert('Error', 'Failed to load contacts');
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +99,7 @@ const ContactsScreen: React.FC = () => {
   };
 
   const handleAddContact = () => {
-    Alert.alert(
+    RNAlert.alert(
       'Add Contact',
       'Enter the email address of the person you want to add:',
       [
@@ -108,7 +108,7 @@ const ContactsScreen: React.FC = () => {
           text: 'Add',
           onPress: () => {
             // In a real app, you'd implement contact addition
-            Alert.alert('Coming Soon', 'Contact addition will be available in the next update.');
+            RNAlert.alert('Coming Soon', 'Contact addition will be available in the next update.');
           },
         },
       ]

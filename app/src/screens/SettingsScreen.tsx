@@ -4,8 +4,9 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  Alert as RNAlert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,38 +16,87 @@ const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: logout
-        },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        logout();
+      }
+    } else {
+      RNAlert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Logout', 
+            style: 'destructive',
+            onPress: logout
+          },
+        ]
+      );
+    }
+  };
+
+  const handleProfile = () => {
+    const message = 'Profile editing will be available in a future update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+  };
+
+  const handleDeviceKeys = () => {
+    const message = 'Device key management will be available in a future update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
+  };
+
+  const handleDeleteAccount = () => {
+    const confirmationMessage = 'This is a destructive action and cannot be undone. Are you sure you want to permanently delete your account?';
+    const comingSoonMessage = 'Account deletion will be implemented soon.';
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmationMessage)) {
+        window.alert(comingSoonMessage);
+      }
+    } else {
+      RNAlert.alert(
+        'Delete Account',
+        confirmationMessage,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => RNAlert.alert('Coming Soon', comingSoonMessage) },
+        ]
+      );
+    }
+  };
+
+  const handleHelpAndSupport = () => {
+    const message = 'The help and support section will be available in a future update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
   };
 
   const handleKeyVerification = () => {
-    Alert.alert('Coming Soon', 'Key verification feature will be available in the next update.');
+    const message = 'Key verification feature will be available in the next update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
   };
 
   const handleNotifications = () => {
-    Alert.alert('Coming Soon', 'Notification settings will be available in the next update.');
+    const message = 'Notification settings will be available in the next update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
   };
 
   const handlePrivacy = () => {
-    Alert.alert('Coming Soon', 'Privacy settings will be available in the next update.');
+    const message = 'Privacy settings will be available in the next update.';
+    Platform.OS === 'web' ? window.alert(message) : RNAlert.alert('Coming Soon', message);
   };
 
   const handleAbout = () => {
-    Alert.alert(
-      'About E2EE Messenger',
-      'Version 1.0.0\n\nA privacy-first end-to-end encrypted messaging app built with React Native and Go.',
-      [{ text: 'OK' }]
-    );
+    const message = 'Version 1.0.0\n\nA privacy-first end-to-end encrypted messaging app built with React Native and Go.';
+    if (Platform.OS === 'web') {
+      window.alert(message);
+    } else {
+      RNAlert.alert(
+        'About E2EE Messenger',
+        message,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const renderSettingItem = (
@@ -84,7 +134,7 @@ const SettingsScreen: React.FC = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        {renderSettingItem('person-outline', 'Profile', 'Edit your profile information')}
+        {renderSettingItem('person-outline', 'Profile', 'Edit your profile information', handleProfile)}
         {renderSettingItem('shield-checkmark-outline', 'Key Verification', 'Verify contact safety numbers', handleKeyVerification)}
         {renderSettingItem('notifications-outline', 'Notifications', 'Manage notification preferences', handleNotifications)}
       </View>
@@ -92,13 +142,13 @@ const SettingsScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacy & Security</Text>
         {renderSettingItem('lock-closed-outline', 'Privacy Settings', 'Control your privacy', handlePrivacy)}
-        {renderSettingItem('key-outline', 'Device Keys', 'Manage your device keys')}
-        {renderSettingItem('trash-outline', 'Delete Account', 'Permanently delete your account', undefined, false)}
+        {renderSettingItem('key-outline', 'Device Keys', 'Manage your device keys', handleDeviceKeys)}
+        {renderSettingItem('trash-outline', 'Delete Account', 'Permanently delete your account', handleDeleteAccount, false)}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Support</Text>
-        {renderSettingItem('help-circle-outline', 'Help & Support', 'Get help and contact support')}
+        {renderSettingItem('help-circle-outline', 'Help & Support', 'Get help and contact support', handleHelpAndSupport)}
         {renderSettingItem('information-circle-outline', 'About', 'App version and information', handleAbout)}
       </View>
 

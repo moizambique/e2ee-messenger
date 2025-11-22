@@ -5,7 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  Alert as RNAlert,
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -91,7 +91,7 @@ const ChatsScreen: React.FC = () => {
   );
 
   if (error) {
-    Alert.alert('Error', error, [
+    RNAlert.alert('Error', error, [
       { text: 'OK', onPress: clearError }
     ]);
   }

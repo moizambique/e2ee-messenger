@@ -8,7 +8,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  Alert as RNAlert,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,7 +43,7 @@ const ChatScreen: React.FC = () => {
 
   useEffect(() => {
     if (error) {
-      Alert.alert('Error', error, [
+      RNAlert.alert('Error', error, [
         { text: 'OK', onPress: clearError }
       ]);
     }
@@ -65,14 +65,14 @@ const ChatScreen: React.FC = () => {
     } catch (error) {
       // Restore message text on error
       setMessageText(text);
-      Alert.alert('Error', 'Failed to send message');
+      RNAlert.alert('Error', 'Failed to send message');
     } finally {
       setSending(false);
     }
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isOwn = item.senderId === user?.id;
+    const isOwn = item.sender_id === user?.id;
     
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>

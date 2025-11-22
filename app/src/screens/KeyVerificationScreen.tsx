@@ -4,7 +4,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  Alert as RNAlert,
   ScrollView,
   Clipboard,
 } from 'react-native';
@@ -34,7 +34,7 @@ const KeyVerificationScreen: React.FC = () => {
       const verification = await generateSafetyNumber(userId, deviceId);
       setKeyVerification(verification);
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate safety number');
+      RNAlert.alert('Error', 'Failed to generate safety number');
     } finally {
       setLoading(false);
     }
@@ -43,19 +43,19 @@ const KeyVerificationScreen: React.FC = () => {
   const handleCopySafetyNumber = () => {
     if (keyVerification) {
       Clipboard.setString(keyVerification.safetyNumber);
-      Alert.alert('Copied', 'Safety number copied to clipboard');
+      RNAlert.alert('Copied', 'Safety number copied to clipboard');
     }
   };
 
   const handleCopyFingerprint = () => {
     if (keyVerification) {
       Clipboard.setString(keyVerification.fingerprint);
-      Alert.alert('Copied', 'Fingerprint copied to clipboard');
+      RNAlert.alert('Copied', 'Fingerprint copied to clipboard');
     }
   };
 
   const handleVerify = () => {
-    Alert.alert(
+    RNAlert.alert(
       'Verify Contact',
       'Have you verified this safety number with the contact in person or through a secure channel?',
       [
@@ -64,7 +64,7 @@ const KeyVerificationScreen: React.FC = () => {
           text: 'Verify', 
           onPress: () => {
             setKeyVerification(prev => prev ? { ...prev, isVerified: true, verifiedAt: new Date() } : null);
-            Alert.alert('Verified', 'Contact has been verified successfully');
+            RNAlert.alert('Verified', 'Contact has been verified successfully');
           }
         },
       ]
@@ -72,7 +72,7 @@ const KeyVerificationScreen: React.FC = () => {
   };
 
   const handleUnverify = () => {
-    Alert.alert(
+    RNAlert.alert(
       'Unverify Contact',
       'Are you sure you want to unverify this contact?',
       [
@@ -82,7 +82,7 @@ const KeyVerificationScreen: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             setKeyVerification(prev => prev ? { ...prev, isVerified: false, verifiedAt: undefined } : null);
-            Alert.alert('Unverified', 'Contact verification has been removed');
+            RNAlert.alert('Unverified', 'Contact verification has been removed');
           }
         },
       ]
