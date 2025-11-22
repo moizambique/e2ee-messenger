@@ -10,6 +10,10 @@ import ChatScreen from '../screens/ChatScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import KeyVerificationScreen from '../screens/KeyVerificationScreen';
 import ContactsScreen from '../screens/ContactsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import PrivacyScreen from '../screens/PrivacyScreen';
+import DeviceKeysScreen from '../screens/DeviceKeysScreen';
 import { RootStackParamList, MainTabParamList } from '../types';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -85,6 +89,38 @@ const AppNavigator: React.FC = () => {
               title: 'Key Verification',
               headerBackTitle: 'Back'
             }}
+          />
+          <Stack.Screen 
+            name="Profile" 
+            component={ProfileScreen}
+            options={{ 
+              headerShown: true,
+              title: 'Profile',
+              headerBackTitle: 'Settings'
+            }}
+          />
+          <Stack.Screen 
+            name="Notifications" 
+            component={NotificationsScreen}
+            options={{ 
+              headerShown: true,
+              title: 'Notifications',
+              headerBackTitle: 'Settings'
+            }}
+          />
+          <Stack.Screen 
+            name="Privacy" 
+            component={PrivacyScreen}
+            options={{ 
+              headerShown: true,
+              title: 'Privacy Settings',
+              headerBackTitle: 'Settings'
+            }}
+          />
+          <Stack.Screen 
+            name="DeviceKeys" 
+            component={DeviceKeysScreen}
+            options={{ headerShown: true, title: 'Device Keys', headerBackTitle: 'Settings' }}
           />
         </>
       )}

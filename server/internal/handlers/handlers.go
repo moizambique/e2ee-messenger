@@ -145,6 +145,52 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// UpdateProfile handles updating the current user's profile
+func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	var req models.UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Check if the new username is already taken by another user
+	var existingUserID uuid.UUID
+	err := h.db.QueryRow("SELECT id FROM users WHERE username = $1 AND id != $2", req.Username, userID).Scan(&existingUserID)
+	if err != nil && err != sql.ErrNoRows {
+		respondWithError(w, http.StatusInternalServerError, "Database error while checking username")
+		return
+	}
+	if err == nil {
+		respondWithError(w, http.StatusConflict, "This username is already taken")
+		return
+	}
+
+	// Update user in the database
+	var updatedUser models.User
+	err = h.db.QueryRow(`
+		UPDATE users 
+		SET username = $1, updated_at = $2 
+		WHERE id = $3
+		RETURNING id, username, email, password, created_at, updated_at
+	`, req.Username, time.Now(), userID).Scan(
+		&updatedUser.ID, &updatedUser.Username, &updatedUser.Email, &updatedUser.Password, &updatedUser.CreatedAt, &updatedUser.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			respondWithError(w, http.StatusNotFound, "User not found")
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Failed to update user profile")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedUser)
+}
+
 // UploadDeviceKey handles device key upload
 func (h *Handlers) UploadDeviceKey(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)

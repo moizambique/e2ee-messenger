@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAuthStore } from './authStore';
 import { webSocketService } from '../services/websocket';
 import { apiService } from '../services/api';
+import { UpdateProfileRequest } from '../types';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -12,6 +13,7 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -32,9 +34,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     login,
     signup,
+    updateProfile,
     logout,
     clearError,
   } = useAuthStore();
+
+  // Keep the apiService token in sync with the auth state
+  useEffect(() => {
+    apiService.setToken(token);
+  }, [token]);
 
   // Initialize WebSocket connection when authenticated
   useEffect(() => {
@@ -71,6 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     login,
     signup,
+    updateProfile,
     logout,
     clearError,
   };

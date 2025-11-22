@@ -18,12 +18,12 @@ type User struct {
 
 // DeviceKey represents a device's identity key
 type DeviceKey struct {
-	ID         uuid.UUID `json:"id" db:"id"`
-	UserID     uuid.UUID `json:"user_id" db:"user_id"`
-	DeviceID   string    `json:"device_id" db:"device_id"`
-	PublicKey  string    `json:"public_key" db:"public_key"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+	ID        uuid.UUID `json:"id" db:"id"`
+	UserID    uuid.UUID `json:"user_id" db:"user_id"`
+	DeviceID  string    `json:"device_id" db:"device_id"`
+	PublicKey string    `json:"public_key" db:"public_key"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // OneTimeKey represents a one-time prekey
@@ -68,11 +68,11 @@ type Group struct {
 
 // GroupMember represents a group membership (Phase 2 placeholder)
 type GroupMember struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	GroupID   uuid.UUID `json:"group_id" db:"group_id"`
-	UserID    uuid.UUID `json:"user_id" db:"user_id"`
-	Role      string    `json:"role" db:"role"` // "admin", "member"
-	JoinedAt  time.Time `json:"joined_at" db:"joined_at"`
+	ID       uuid.UUID `json:"id" db:"id"`
+	GroupID  uuid.UUID `json:"group_id" db:"group_id"`
+	UserID   uuid.UUID `json:"user_id" db:"user_id"`
+	Role     string    `json:"role" db:"role"` // "admin", "member"
+	JoinedAt time.Time `json:"joined_at" db:"joined_at"`
 }
 
 // Attachment represents an encrypted file attachment (Phase 2 placeholder)
@@ -102,6 +102,11 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required"`
 }
 
+// UpdateProfileRequest represents a user profile update request
+type UpdateProfileRequest struct {
+	Username string `json:"username" validate:"required,min=3,max=50"`
+}
+
 // AuthResponse represents an authentication response
 type AuthResponse struct {
 	Token    string `json:"token"`
@@ -123,15 +128,15 @@ type OneTimeKeyRequest struct {
 
 // BootstrapKeysResponse represents the response for bootstrap keys
 type BootstrapKeysResponse struct {
-	DeviceKeys   []DeviceKey   `json:"device_keys"`
-	OneTimeKeys  []OneTimeKey  `json:"one_time_keys"`
+	DeviceKeys  []DeviceKey  `json:"device_keys"`
+	OneTimeKeys []OneTimeKey `json:"one_time_keys"`
 }
 
 // SendMessageRequest represents a message send request
 type SendMessageRequest struct {
-	RecipientID     string `json:"recipient_id" validate:"required"`
+	RecipientID      string `json:"recipient_id" validate:"required"`
 	EncryptedContent string `json:"encrypted_content" validate:"required"`
-	MessageType     string `json:"message_type" validate:"required,oneof=text file system"`
+	MessageType      string `json:"message_type" validate:"required,oneof=text file system"`
 }
 
 // GetMessagesRequest represents a get messages request

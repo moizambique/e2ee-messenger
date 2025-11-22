@@ -17,20 +17,26 @@ const UserIDKey contextKey = "user_id"
 func Auth(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var tokenString string
+
+			// First, try to get token from Authorization header
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				http.Error(w, "Authorization header required", http.StatusUnauthorized)
-				return
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) != 2 || parts[0] != "Bearer" {
+					http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+					return
+				}
+				tokenString = parts[1]
+			} else {
+				// If not in header, try to get from URL query parameter (for WebSocket)
+				tokenString = r.URL.Query().Get("token")
 			}
 
-			// Extract token from "Bearer <token>"
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			if tokenString == "" {
+				http.Error(w, "Authorization token required", http.StatusUnauthorized)
 				return
 			}
-
-			tokenString := parts[1]
 
 			// Parse and validate token
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

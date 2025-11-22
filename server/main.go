@@ -80,6 +80,9 @@ func main() {
 			r.Use(authmiddleware.Auth(cfg.JWTSecret))
 			r.Use(authmiddleware.UserContext)
 
+			// Profile
+			r.Put("/profile", h.UpdateProfile)
+
 			// Key management
 			r.Route("/keys", func(r chi.Router) {
 				r.Post("/device", h.UploadDeviceKey)

@@ -69,6 +69,10 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UpdateProfileRequest {
+  username: string;
+}
+
 export interface SendMessageRequest {
   recipient_id: string;
   encrypted_content: string;
@@ -121,6 +125,10 @@ export type RootStackParamList = {
   Main: undefined;
   Chat: { chatId: string; participant: User };
   Settings: undefined;
+  Profile: undefined;
+  Notifications: undefined;
+  Privacy: undefined;
+  DeviceKeys: undefined;
   KeyVerification: { userId: string; deviceId: string };
 };
 

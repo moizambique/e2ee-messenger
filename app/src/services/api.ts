@@ -9,7 +9,8 @@ import {
   SendMessageRequest,
   GetMessagesRequest,
   SendReceiptRequest,
-  User
+  User,
+  UpdateProfileRequest
 } from '../types';
 
 const API_BASE_URL = __DEV__ 
@@ -62,6 +63,14 @@ class ApiService {
   async login(data: LoginRequest): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Profile endpoint
+  async updateProfile(data: UpdateProfileRequest): Promise<User> {
+    return this.request<User>('/profile', {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }

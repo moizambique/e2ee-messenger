@@ -36,17 +36,11 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleProfile = () => {
-    // This will navigate to a new screen we will create
-    showAlert('Coming Soon', 'Profile editing will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+    navigation.navigate('Profile');
   };
 
   const handleDeviceKeys = () => {
-    // This will navigate to a new screen we will create
-    showAlert('Coming Soon', 'Device key management will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+    navigation.navigate('DeviceKeys');
   };
 
   const handleDeleteAccount = () => {
@@ -75,25 +69,16 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleKeyVerification = () => {
-    // This will navigate to a new screen we will create
-    // For now, we'll keep the alert as a placeholder.
-    showAlert('Coming Soon', 'Key verification will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+    // Example navigation, you might need to pass actual IDs
+    navigation.navigate('KeyVerification', { userId: 'some-user-id', deviceId: 'some-device-id' });
   };
 
   const handleNotifications = () => {
-    // This will navigate to a new screen we will create
-    showAlert('Coming Soon', 'Notification settings will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+    navigation.navigate('Notifications');
   };
 
   const handlePrivacy = () => {
-    // This will navigate to a new screen we will create
-    showAlert('Coming Soon', 'Privacy settings will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+    navigation.navigate('Privacy');
   };
 
   const handleAbout = () => {
