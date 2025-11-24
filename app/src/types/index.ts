@@ -45,7 +45,6 @@ export interface Receipt {
 
 export interface Chat {
   id: string;
-  participant_id: string;
   participant: User;
   last_message?: Message;
   unread_count: number;

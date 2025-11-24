@@ -83,6 +83,10 @@ func main() {
 			// Profile
 			r.Put("/profile", h.UpdateProfile)
 
+			// Users & Chats
+			r.Get("/users", h.GetUsers)
+			r.Get("/chats", h.GetChats)
+
 			// Key management
 			r.Route("/keys", func(r chi.Router) {
 				r.Post("/device", h.UploadDeviceKey)

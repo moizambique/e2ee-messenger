@@ -16,6 +16,15 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// Chat represents a conversation in the chat list
+type Chat struct {
+	ID          string    `json:"id"`
+	Participant User      `json:"participant"`
+	LastMessage *Message  `json:"last_message,omitempty"`
+	UnreadCount int       `json:"unread_count"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // DeviceKey represents a device's identity key
 type DeviceKey struct {
 	ID        uuid.UUID `json:"id" db:"id"`

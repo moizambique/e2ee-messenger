@@ -191,6 +191,94 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedUser)
 }
 
+// GetUsers returns a list of all users, excluding the current user
+func (h *Handlers) GetUsers(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	rows, err := h.db.Query(`
+		SELECT id, username, email, created_at, updated_at
+		FROM users
+		WHERE id != $1
+		ORDER BY username ASC
+	`, userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to fetch users")
+		return
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan user")
+			return
+		}
+		users = append(users, user)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
+}
+
+// GetChats returns a list of chats for the current user
+func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	query := `
+		WITH last_messages AS (
+			SELECT
+				DISTINCT ON (
+					CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END
+				)
+				CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END as participant_id,
+				id,
+				sender_id,
+				recipient_id,
+				encrypted_content,
+				message_type,
+				created_at
+			FROM messages
+			WHERE sender_id = $1 OR recipient_id = $1
+			ORDER BY participant_id, created_at DESC
+		)
+		SELECT
+			u.id, u.username, u.email, u.created_at, u.updated_at,
+			lm.id, lm.sender_id, lm.recipient_id, lm.encrypted_content, lm.message_type, lm.created_at
+		FROM last_messages lm
+		JOIN users u ON u.id = lm.participant_id
+		ORDER BY lm.created_at DESC;
+	`
+
+	rows, err := h.db.Query(query, userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to fetch chats")
+		return
+	}
+	defer rows.Close()
+
+	var chats []models.Chat
+	for rows.Next() {
+		var chat models.Chat
+		var participant models.User
+		var lastMessage models.Message
+		if err := rows.Scan(&participant.ID, &participant.Username, &participant.Email, &participant.CreatedAt, &participant.UpdatedAt, &lastMessage.ID, &lastMessage.SenderID, &lastMessage.RecipientID, &lastMessage.EncryptedContent, &lastMessage.MessageType, &lastMessage.CreatedAt); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to scan chat")
+			return
+		}
+		chat.ID = "chat_" + participant.ID.String()
+		chat.Participant = participant
+		chat.LastMessage = &lastMessage
+		chat.UpdatedAt = lastMessage.CreatedAt
+		// Unread count is mocked as 0 for now. A real implementation would require another query.
+		chat.UnreadCount = 0
+		chats = append(chats, chat)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(chats)
+}
+
 // UploadDeviceKey handles device key upload
 func (h *Handlers) UploadDeviceKey(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
@@ -416,18 +504,21 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 			SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at
 			FROM messages 
 			WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1))
-			AND created_at > $3
-			ORDER BY created_at ASC
+			AND created_at > $3			
+			ORDER BY created_at DESC
 			LIMIT $4
 		`
 		args = []interface{}{userID, recipientID, since, limit}
 	} else {
 		query = `
-			SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at
+			SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at FROM (
+				SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at
 			FROM messages 
 			WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1))
-			ORDER BY created_at ASC
+				ORDER BY created_at DESC
 			LIMIT $3
+			) sub
+			ORDER BY created_at ASC;
 		`
 		args = []interface{}{userID, recipientID, limit}
 	}

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { Chat, Message, User } from '../types';
 import { apiService } from '../services/api';
-import { decryptMessage, getSession } from '../crypto/crypto';
+import { EncryptedMessage } from '../crypto/types';
+import { encryptMessage, decryptMessage, getSession, establishSession } from '../crypto/crypto';
 
 interface ChatState {
   // State
@@ -39,53 +40,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Mock chats for demonstration
-      const mockChats: Chat[] = [
-        {
-          id: 'chat_1',
-          participant_id: '2',
-          participant: {
-            id: '2',
-            username: 'Alice',
-            email: 'alice@example.com',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          last_message: {
-            id: 'msg_1',
-            sender_id: '2',
-            recipient_id: '1',
-            encrypted_content: 'Hello! How are you?',
-            message_type: 'text',
-            created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
-          },
-          unread_count: 2,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 'chat_2',
-          participant_id: '3',
-          participant: {
-            id: '3',
-            username: 'Bob',
-            email: 'bob@example.com',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          last_message: {
-            id: 'msg_2',
-            sender_id: '1',
-            recipient_id: '3',
-            encrypted_content: 'Thanks for the help!',
-            message_type: 'text',
-            created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-          },
-          unread_count: 0,
-          updated_at: new Date().toISOString(),
-        },
-      ];
-      
-      set({ chats: mockChats, isLoading: false });
+      const chats = await apiService.getChats();
+      set({ chats, isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
@@ -98,43 +54,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Mock messages for demonstration
-      const mockMessages: Message[] = [
-        {
-          id: 'msg_1',
-          sender_id: recipientId,
-          recipient_id: '1',
-          encrypted_content: 'Hello! How are you doing?',
-          message_type: 'text',
-          created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
-        },
-        {
-          id: 'msg_2',
-          sender_id: '1',
-          recipient_id: recipientId,
-          encrypted_content: 'Hi! I\'m doing great, thanks for asking!',
-          message_type: 'text',
-          created_at: new Date(Date.now() - 1000 * 60 * 8).toISOString(), // 8 minutes ago
-        },
-        {
-          id: 'msg_3',
-          sender_id: recipientId,
-          recipient_id: '1',
-          encrypted_content: 'That\'s wonderful to hear! Are you working on any interesting projects?',
-          message_type: 'text',
-          created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
-        },
-        {
-          id: 'msg_4',
-          sender_id: '1',
-          recipient_id: recipientId,
-          encrypted_content: 'Yes! I\'m building an E2EE messenger app. It\'s quite challenging but fun!',
-          message_type: 'text',
-          created_at: new Date(Date.now() - 1000 * 60 * 3).toISOString(), // 3 minutes ago
-        },
-      ];
-
-      set({ messages: mockMessages, isLoading: false });
+      const messages = await apiService.getMessages({ recipient_id: recipientId, limit: 50 });
+      set({ messages: messages || [], isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
@@ -144,29 +65,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: async (recipientId: string, content: string, type: 'text' | 'file' | 'system') => {
+    const tempId = `temp_${Date.now()}`;
     try {
-      // Create a mock message for demonstration
-      const mockMessage: Message = {
-        id: `msg_${Date.now()}`,
-        sender_id: '1', // Current user ID
-        recipient_id: recipientId,
-        encrypted_content: content, // In real app, this would be encrypted
-        message_type: type,
-        created_at: new Date().toISOString(),
+      // In a real app, you would establish a session when starting a chat
+      // For now, we do it before sending a message if it doesn't exist.
+      const deviceId = 'mock-device-id'; // This would come from the user object or key bundle
+      const sessionId = `${recipientId}_${deviceId}`;
+      let session = await getSession(sessionId);
+      if (!session) {
+        // This preKeyBundle would be fetched from the server for the recipient
+        const mockPreKeyBundle: any = { identityKey: 'mock', preKey: 'mock' };
+        session = await establishSession(recipientId, deviceId, mockPreKeyBundle);
+      }
+
+      const message: EncryptedMessage = {
+        messageId: tempId,
+        senderId: 'self', // Will be set by the server
+        recipientId: recipientId,
+        content: content,
+        type: type,
+        timestamp: Date.now(),
       };
 
-      // Add to local state immediately for better UX
-      get().addMessage(mockMessage);
+      const encryptedContent = await encryptMessage(session.id, message);
 
-      // In a real app, you would:
-      // 1. Encrypt the message
-      // 2. Send to server
-      // 3. Handle server response
-      // 4. Update message status (sent, delivered, read)
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      const sentMessage = await apiService.sendMessage({
+        recipient_id: recipientId,
+        encrypted_content: encryptedContent,
+        message_type: type,
+      });
+
+      // Add to local state immediately for better UX
+      get().addMessage(sentMessage);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to send message',
@@ -178,7 +108,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setCurrentChat: (chat: Chat | null) => {
     set({ currentChat: chat });
     if (chat) {
-      get().loadMessages(chat.participant_id);
+      get().loadMessages(chat.participant.id);
     } else {
       get().clearMessages();
     }

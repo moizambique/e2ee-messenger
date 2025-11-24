@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../store/AuthContext';
 import { RootStackParamList, User } from '../types';
+import { apiService } from '../services/api';
 
 type ContactsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -27,31 +28,6 @@ const ContactsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Mock contacts for demonstration
-  const mockContacts: User[] = [
-    {
-      id: '2',
-      username: 'Alice',
-      email: 'alice@example.com',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '3',
-      username: 'Bob',
-      email: 'bob@example.com',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: '4',
-      username: 'Charlie',
-      email: 'charlie@example.com',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ];
-
   useEffect(() => {
     loadContacts();
   }, []);
@@ -63,9 +39,8 @@ const ContactsScreen: React.FC = () => {
   const loadContacts = async () => {
     setIsLoading(true);
     try {
-      // In a real app, you'd fetch from API
-      // For now, using mock data
-      setContacts(mockContacts);
+      const fetchedContacts = await apiService.getUsers();
+      setContacts(fetchedContacts);
     } catch (error) {
       RNAlert.alert('Error', 'Failed to load contacts');
     } finally {

@@ -43,7 +43,7 @@ const ChatsScreen: React.FC = () => {
 
   const renderChatItem = ({ item }: { item: Chat }) => (
     <TouchableOpacity
-      style={styles.chatItem}
+      style={styles.chatItem} 
       onPress={() => handleChatPress(item)}
     >
       <View style={styles.avatar}>
@@ -56,7 +56,7 @@ const ChatsScreen: React.FC = () => {
         <View style={styles.chatHeader}>
           <Text style={styles.chatName}>{item.participant.username}</Text>
           <Text style={styles.chatTime}>
-            {item.last_message 
+            {item.last_message
               ? new Date(item.last_message.created_at).toLocaleTimeString([], { 
                   hour: '2-digit', 
                   minute: '2-digit' 

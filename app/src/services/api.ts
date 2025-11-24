@@ -10,7 +10,8 @@ import {
   GetMessagesRequest,
   SendReceiptRequest,
   User,
-  UpdateProfileRequest
+  UpdateProfileRequest,
+  Chat
 } from '../types';
 
 const API_BASE_URL = __DEV__ 
@@ -73,6 +74,15 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  // User & Chat endpoints
+  async getUsers(): Promise<User[]> {
+    return this.request<User[]>('/users');
+  }
+
+  async getChats(): Promise<Chat[]> {
+    return this.request<Chat[]>('/chats');
   }
 
   // Key management endpoints

@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
+import { Buffer } from 'buffer';
 import { IdentityKeyPair, PreKeyBundle, Session, EncryptedMessage, DecryptedMessage, KeyVerification, CryptoError } from './types';
 
 // Storage keys
@@ -140,12 +141,9 @@ class CryptoManager {
         throw this.createCryptoError('SESSION_EXPIRED', 'Session not found');
       }
 
-      // Simplified encryption - in production, use proper Signal protocol
-      const encrypted = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        `${text}_${sessionId}_${Date.now()}`,
-        { encoding: Crypto.CryptoEncoding.BASE64 }
-      );
+      // Simplified "encryption" (Base64 encoding) - in production, use proper Signal protocol
+      // This is for demonstration to make messages readable in the DB
+      const encrypted = Buffer.from(text).toString('base64');
 
       session.lastUsed = new Date();
       await this.saveSessions();
@@ -170,8 +168,8 @@ class CryptoManager {
       }
 
       // Simplified decryption - in production, use proper Signal protocol
-      // This is just a mock implementation
-      const decrypted = `decrypted_${encryptedPayload}_${sessionId}`;
+      // This is just a mock implementation to decode Base64
+      const decrypted = Buffer.from(encryptedPayload, 'base64').toString('utf-8');
 
       session.lastUsed = new Date();
       await this.saveSessions();
@@ -205,13 +203,17 @@ class CryptoManager {
    */
   async decryptMessage(sessionId: string, encryptedPayload: string): Promise<DecryptedMessage> {
     try {
-      const decryptedJson = await this.decryptText(sessionId, encryptedPayload);
-      const message = JSON.parse(decryptedJson) as EncryptedMessage;
-      
-      return {
-        ...message,
-        plaintext: message.content, // In real implementation, this would be the actual decrypted content
-      };
+      // In a real implementation, the entire payload would be a single encrypted blob.
+      // Here, we assume the content property of the message is what's "encrypted".
+      // For this mock, we'll just decode it.
+      const plaintext = Buffer.from(encryptedPayload, 'base64').toString('utf-8');
+
+      // This part is tricky with the current mock. A real implementation would
+      // decrypt a structured object. We will just return a partial object.
+      const decryptedMessage: DecryptedMessage = JSON.parse(plaintext);
+      decryptedMessage.plaintext = decryptedMessage.content;
+
+      return decryptedMessage;
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
         throw error;
