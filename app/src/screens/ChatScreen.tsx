@@ -10,6 +10,7 @@ import {
   Platform,
   Alert as RNAlert,
 } from 'react-native';
+import { Buffer } from 'buffer';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -21,7 +22,7 @@ type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 
 const ChatScreen: React.FC = () => {
   const route = useRoute<ChatScreenRouteProp>();
-  const { chatId, participant } = route.params;
+  const { participant } = route.params;
   const { user } = useAuth();
   const { 
     messages, 
@@ -78,7 +79,15 @@ const ChatScreen: React.FC = () => {
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
         <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
           <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
-            {item.encrypted_content}
+            {(() => {
+              try {
+                const decoded = Buffer.from(item.encrypted_content, 'base64').toString('utf-8');
+                const parsed = JSON.parse(decoded);
+                return parsed.content || item.encrypted_content;
+              } catch (e) {
+                return item.encrypted_content;
+              }
+            })()}
           </Text>
           <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
             {new Date(item.created_at).toLocaleTimeString([], { 

@@ -41,7 +41,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     try {
       const chats = await apiService.getChats();
-      set({ chats, isLoading: false });
+      set({ chats: chats || [], isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
@@ -90,7 +90,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const encryptedContent = await encryptMessage(session.id, message);
 
       const sentMessage = await apiService.sendMessage({
-        recipient_id: recipientId,
+        recipient_id: message.recipientId,
         encrypted_content: encryptedContent,
         message_type: type,
       });

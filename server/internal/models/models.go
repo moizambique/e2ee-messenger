@@ -143,7 +143,7 @@ type BootstrapKeysResponse struct {
 
 // SendMessageRequest represents a message send request
 type SendMessageRequest struct {
-	RecipientID      string `json:"recipient_id" validate:"required"`
+	RecipientID      string `json:"recipient_id" validate:"required"` // This tag was correct, but let's double check the client
 	EncryptedContent string `json:"encrypted_content" validate:"required"`
 	MessageType      string `json:"message_type" validate:"required,oneof=text file system"`
 }

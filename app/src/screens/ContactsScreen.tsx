@@ -14,12 +14,14 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../store/AuthContext';
-import { RootStackParamList, User } from '../types';
+import { useChatStore } from '../store/chatStore';
+import { RootStackParamList, User, Chat } from '../types';
 import { apiService } from '../services/api';
 
 type ContactsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const ContactsScreen: React.FC = () => {
+  const { chats } = useChatStore();
   const navigation = useNavigation<ContactsScreenNavigationProp>();
   const { user } = useAuth();
   const [contacts, setContacts] = useState<User[]>([]);
@@ -67,10 +69,21 @@ const ContactsScreen: React.FC = () => {
   };
 
   const handleContactPress = (contact: User) => {
-    navigation.navigate('Chat', {
-      chatId: `chat_${user?.id}_${contact.id}`,
-      participant: contact,
-    });
+    // Find if a chat with this participant already exists
+    const existingChat = chats.find(chat => chat.participant.id === contact.id);
+
+    if (existingChat) {
+      navigation.navigate('Chat', { participant: contact });
+    } else {
+      // If no chat exists, create a temporary one to start the conversation
+      const newChat: Chat = {
+        id: `temp_chat_${contact.id}`,
+        participant: contact,
+        unread_count: 0,
+        updated_at: new Date().toISOString(),
+      };
+      navigation.navigate('Chat', { participant: newChat.participant });
+    }
   };
 
   const handleAddContact = () => {

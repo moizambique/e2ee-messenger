@@ -108,7 +108,7 @@ class ApiService {
   async sendMessage(data: SendMessageRequest): Promise<Message> {
     return this.request<Message>('/messages', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, recipient_id: data.recipient_id }),
     });
   }
 

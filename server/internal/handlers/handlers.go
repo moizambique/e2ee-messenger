@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -427,6 +428,8 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Received SendMessage request for recipient: %s", req.RecipientID)
+
 	recipientID, err := uuid.Parse(req.RecipientID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
@@ -442,12 +445,15 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:        time.Now(),
 	}
 
+	log.Printf("DB INSERT: sender_id=%s, recipient_id=%s", message.SenderID, message.RecipientID)
+
 	_, err = h.db.Exec(`
 		INSERT INTO messages (id, sender_id, recipient_id, encrypted_content, message_type, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, message.ID, message.SenderID, message.RecipientID, message.EncryptedContent, message.MessageType, message.CreatedAt)
 
 	if err != nil {
+		log.Printf("Database error on message insert: %v", err) // Add detailed logging
 		respondWithError(w, http.StatusInternalServerError, "Failed to send message")
 		return
 	}

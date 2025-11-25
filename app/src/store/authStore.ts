@@ -22,6 +22,7 @@ interface AuthState {
   setError: (error: string | null) => void;
   clearError: () => void;
   setLoading: (loading: boolean) => void;
+  rehydrate: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -155,6 +156,13 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (loading: boolean) => {
         set({ isLoading: loading });
       },
+
+      rehydrate: () => {
+        const { token } = get();
+        if (token) {
+          apiService.setToken(token);
+        }
+      },
     }),
     {
       name: 'auth-storage',
@@ -165,6 +173,11 @@ export const useAuthStore = create<AuthState>()(
         deviceId: state.deviceId,
         token: state.token,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.rehydrate();
+        }
+      },
     }
   )
 );

@@ -75,7 +75,7 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen 
             name="Chat" 
             component={ChatScreen}
-            options={{ 
+            options={{
               headerShown: true,
               title: 'Chat',
               headerBackTitle: 'Back'

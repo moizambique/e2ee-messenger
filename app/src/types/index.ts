@@ -122,7 +122,7 @@ export interface KeyVerificationState {
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-  Chat: { chatId: string; participant: User };
+  Chat: { participant: User };
   Settings: undefined;
   Profile: undefined;
   Notifications: undefined;

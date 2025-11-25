@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { Buffer } from 'buffer';
 
 import { useAuth } from '../store/AuthContext';
 import { useChatStore } from '../store/chatStore';
@@ -23,10 +24,11 @@ const ChatsScreen: React.FC = () => {
   const { user } = useAuth();
   const { chats, isLoading, error, loadChats, clearError } = useChatStore();
   const [refreshing, setRefreshing] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    loadChats();
-  }, [loadChats]);
+    if (isAuthenticated) loadChats();
+  }, [loadChats, isAuthenticated]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -36,7 +38,6 @@ const ChatsScreen: React.FC = () => {
 
   const handleChatPress = (chat: Chat) => {
     navigation.navigate('Chat', {
-      chatId: chat.id,
       participant: chat.participant,
     });
   };
@@ -68,7 +69,16 @@ const ChatsScreen: React.FC = () => {
         
         <View style={styles.chatFooter}>
           <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.last_message?.encrypted_content || 'No messages yet'}
+            {item.last_message ? (() => {
+              try {
+                // Decode the base64 string, parse the JSON, and get the content
+                const decoded = Buffer.from(item.last_message.encrypted_content, 'base64').toString('utf-8');
+                const parsed = JSON.parse(decoded);
+                return parsed.content || item.last_message.encrypted_content;
+              } catch (e) {
+                return item.last_message.encrypted_content; // Fallback to raw content on error
+              }
+            })() : 'No messages yet'}
           </Text>
           {item.unread_count > 0 && (
             <View style={styles.unreadBadge}>
