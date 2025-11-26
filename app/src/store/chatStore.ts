@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Chat, Message, User } from '../types';
 import { apiService } from '../services/api';
+import { useAuthStore } from './authStore';
 import { EncryptedMessage } from '../crypto/types';
 import { encryptMessage, decryptMessage, getSession, establishSession } from '../crypto/crypto';
 
@@ -18,7 +19,9 @@ interface ChatState {
   sendMessage: (recipientId: string, content: string, type: 'text' | 'file' | 'system') => Promise<void>;
   setCurrentChat: (chat: Chat | null) => void;
   addMessage: (message: Message) => void;
+  updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
+  markMessagesAsRead: (messageIds: string[]) => Promise<void>;
   markMessageAsRead: (messageId: string) => Promise<void>;
   markMessageAsDelivered: (messageId: string) => Promise<void>;
   clearMessages: () => void;
@@ -54,8 +57,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
+      const { user } = useAuthStore.getState();
       const messages = await apiService.getMessages({ recipient_id: recipientId, limit: 50 });
-      set({ messages: messages || [], isLoading: false });
+      const processedMessages = (messages || []).map(msg => {
+        // If the message is from the other person, we don't show a status.
+        // If it's our message, we can assume 'delivered' if it's coming from the server.
+        // A more robust system would store this on the server.
+        if (msg.sender_id === user?.id) {
+          return { ...msg, status: 'delivered' as const };
+        }
+        return msg;
+      });
+
+      set({ messages: processedMessages, isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
@@ -65,10 +79,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: async (recipientId: string, content: string, type: 'text' | 'file' | 'system') => {
+    const { user } = useAuthStore.getState();
     const tempId = `temp_${Date.now()}`;
     try {
       // In a real app, you would establish a session when starting a chat
       // For now, we do it before sending a message if it doesn't exist.
+      // This part is still a mock and needs to be replaced with a real key exchange.
       const deviceId = 'mock-device-id'; // This would come from the user object or key bundle
       const sessionId = `${recipientId}_${deviceId}`;
       let session = await getSession(sessionId);
@@ -79,13 +95,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       const message: EncryptedMessage = {
-        messageId: tempId,
-        senderId: 'self', // Will be set by the server
+        messageId: tempId, // The client-generated temporary ID
+        senderId: user!.id,
         recipientId: recipientId,
         content: content,
         type: type,
         timestamp: Date.now(),
       };
+
+      // Optimistic UI: Add message with 'sending' status immediately
+      const tempMessage: Message = {
+        id: tempId,
+        sender_id: user!.id,
+        recipient_id: recipientId,
+        encrypted_content: await encryptMessage(session.id, message),
+        message_type: type,
+        created_at: new Date().toISOString(),
+        status: 'sending',
+      };
+      get().addMessage(tempMessage);
 
       const encryptedContent = await encryptMessage(session.id, message);
 
@@ -95,9 +123,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         message_type: type,
       });
 
-      // Add to local state immediately for better UX
-      get().addMessage(sentMessage);
+      // Update the temporary message with the real one from the server
+      get().updateMessage(tempId, { ...sentMessage, status: 'sent' });
+
     } catch (error) {
+      // If sending fails, update the status to 'failed'
+      get().updateMessage(tempId, { status: 'failed' });
       set({
         error: error instanceof Error ? error.message : 'Failed to send message',
       });
@@ -120,12 +151,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
+  updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => {
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === messageId ? { ...msg, status } : msg
+      ),
+    }));
+  },
+
   updateMessage: (messageId: string, updates: Partial<Message>) => {
     set((state) => ({
       messages: state.messages.map((msg) =>
         msg.id === messageId ? { ...msg, ...updates } : msg
       ),
     }));
+  },
+
+  markMessagesAsRead: async (messageIds: string[]) => {
+    if (messageIds.length === 0) return;
+
+    // In a real app, you might batch these requests.
+    // For now, we'll send them individually.
+    try {
+      await Promise.all(messageIds.map(id => apiService.sendReceipt({
+        message_id: id,
+        type: 'read',
+      })));
+    } catch (error) {
+      console.error('Failed to send read receipts:', error);
+    }
   },
 
   markMessageAsRead: async (messageId: string) => {

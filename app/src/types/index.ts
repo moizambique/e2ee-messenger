@@ -33,6 +33,7 @@ export interface Message {
   encrypted_content: string;
   message_type: 'text' | 'file' | 'system';
   created_at: string;
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface Receipt {

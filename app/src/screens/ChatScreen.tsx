@@ -28,8 +28,10 @@ const ChatScreen: React.FC = () => {
     messages, 
     isLoading, 
     error, 
-    loadMessages, 
+    loadMessages,
+    setCurrentChat,
     sendMessage, 
+    markMessagesAsRead,
     addMessage,
     clearError 
   } = useChatStore();
@@ -39,8 +41,36 @@ const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    loadMessages(participant.id);
-  }, [participant.id, loadMessages]);
+    // Set the current chat when the screen mounts
+    // The chat object can be minimal as long as it has the participant
+    const currentChat = {
+      id: `chat_${participant.id}`,
+      participant: participant,
+      unread_count: 0,
+      updated_at: new Date().toISOString(),
+    };
+    setCurrentChat(currentChat);
+
+    // Cleanup: Clear the current chat when the screen unmounts
+    return () => {
+      setCurrentChat(null);
+    };
+  }, [participant, setCurrentChat]);
+
+  useEffect(() => {
+    // When messages change, check for unread messages from the participant
+    // and mark them as read.
+    const unreadMessageIds = messages
+      .filter(msg => 
+        msg.sender_id === participant.id && msg.recipient_id === user?.id &&
+        (!msg.status || msg.status !== 'read') // A more robust check might be needed
+      )
+      .map(msg => msg.id);
+
+    if (unreadMessageIds.length > 0) {
+      markMessagesAsRead(unreadMessageIds);
+    }
+  }, [messages, participant.id, markMessagesAsRead]);
 
   useEffect(() => {
     if (error) {
@@ -72,6 +102,25 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  const renderStatusIndicator = (status?: Message['status']) => {
+    if (!status) return null;
+
+    switch (status) {
+      case 'sending':
+        return <Ionicons name="time-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
+      case 'sent':
+        return <Ionicons name="checkmark-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
+      case 'delivered':
+        return <Ionicons name="checkmark-done-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
+      case 'read':
+        return <Ionicons name="checkmark-done-outline" size={14} color="#4F8EF7" style={styles.statusIcon} />; // A different color for read
+      case 'failed':
+        return <Ionicons name="alert-circle-outline" size={14} color="#FF3B30" style={styles.statusIcon} />;
+      default:
+        return null;
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwn = item.sender_id === user?.id;
     
@@ -88,13 +137,13 @@ const ChatScreen: React.FC = () => {
                 return item.encrypted_content;
               }
             })()}
-          </Text>
-          <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
-            {new Date(item.created_at).toLocaleTimeString([], { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })}
-          </Text>
+          </Text>          
+          <View style={styles.messageInfo}>
+            <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            {isOwn && renderStatusIndicator(item.status)}
+          </View>
         </View>
       </View>
     );
@@ -251,14 +300,21 @@ const styles = StyleSheet.create({
   ownMessageText: {
     color: '#fff',
   },
+  messageInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
   messageTime: {
     fontSize: 12,
     color: '#8E8E93',
-    marginTop: 4,
-    alignSelf: 'flex-end',
   },
   ownMessageTime: {
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  statusIcon: {
+    marginLeft: 4,
   },
   inputContainer: {
     backgroundColor: '#fff',

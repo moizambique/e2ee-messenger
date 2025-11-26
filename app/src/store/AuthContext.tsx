@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAuthStore } from './authStore';
+import { useChatStore } from './chatStore';
 import { webSocketService } from '../services/websocket';
 import { apiService } from '../services/api';
 import { UpdateProfileRequest } from '../types';
@@ -52,7 +53,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       webSocketService.connect(wsUrl, token, {
         onMessage: (message) => {
           console.log('WebSocket message received:', message);
-          // Handle incoming messages here
+          // Get the latest state from the store inside the callback
+          const { addMessage, updateMessageStatus, currentChat } = useChatStore.getState();
+
+          if (message.type === 'message_receipt') {
+            const { message_id, type } = message.payload;
+            if (type === 'delivered' || type === 'read') {
+              updateMessageStatus(message_id, type);
+            }
+          } else if (message.type === 'new_message') {
+            const incomingMessage = message.payload;
+            
+            // Only add the message if it belongs to the current open chat
+            if (currentChat && incomingMessage.sender_id === currentChat.participant.id) {
+              addMessage(incomingMessage);
+            }
+            // TODO: In the future, if the chat is not open, update the chat list with unread count.
+          }
         },
         onStatusChange: (status) => {
           console.log('WebSocket status:', status);
@@ -68,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       webSocketService.disconnect();
     };
-  }, [isAuthenticated, token, deviceId]);
+  }, [isAuthenticated, token, deviceId]); // No need to re-run on chat change anymore
 
   const value: AuthContextType = {
     isAuthenticated,

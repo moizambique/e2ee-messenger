@@ -459,15 +459,9 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send real-time notification to recipient
-	notification := map[string]interface{}{
-		"type": "new_message",
-		"payload": map[string]interface{}{
-			"message_id":   message.ID,
-			"sender_id":    message.SenderID,
-			"recipient_id": message.RecipientID,
-			"message_type": message.MessageType,
-			"created_at":   message.CreatedAt,
-		},
+	notification := websocket.Message{
+		Type:    "new_message",
+		Payload: message, // Send the full message object
 	}
 
 	h.hub.SendToUser(recipientID.String(), notification)
