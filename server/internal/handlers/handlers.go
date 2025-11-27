@@ -940,6 +940,89 @@ func (h *Handlers) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(group)
 }
 
+// UploadAttachment handles uploading a file attachment for a message
+func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	// 1. Parse the multipart form data (max 50MB for files)
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		respondWithError(w, http.StatusBadRequest, "File too large (max 50MB)")
+		return
+	}
+
+	// 2. Get the file from the form
+	file, handler, err := r.FormFile("attachment")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid file upload. 'attachment' field missing.")
+		return
+	}
+	defer file.Close()
+
+	// 3. Get other form fields
+	messageIDStr := r.FormValue("message_id")
+	encryptedKey := r.FormValue("encrypted_key")
+	if messageIDStr == "" || encryptedKey == "" {
+		respondWithError(w, http.StatusBadRequest, "message_id and encrypted_key are required")
+		return
+	}
+
+	messageID, err := uuid.Parse(messageIDStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid message_id format")
+		return
+	}
+
+	// Verify that the user has permission to attach a file to this message
+	// (e.g., they are the sender of the message).
+	var senderID uuid.UUID
+	err = h.db.QueryRow("SELECT sender_id FROM messages WHERE id = $1", messageID).Scan(&senderID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Message not found")
+		return
+	}
+	if senderID != userID {
+		respondWithError(w, http.StatusForbidden, "You are not authorized to attach a file to this message")
+		return
+	}
+
+	// 4. Create a unique path and save the file
+	uploadsDir := "./uploads/attachments"
+	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
+		os.MkdirAll(uploadsDir, 0755)
+	}
+
+	// Use message ID for folder to keep attachments organized
+	attachmentDir := filepath.Join(uploadsDir, messageID.String())
+	os.MkdirAll(attachmentDir, 0755)
+	dstPath := filepath.Join(attachmentDir, handler.Filename)
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save file")
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save file content")
+		return
+	}
+
+	// 5. Create the attachment record in the database
+	_, err = h.db.Exec(`
+		INSERT INTO attachments (message_id, file_name, file_size, mime_type, storage_path, encrypted_key)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, messageID, handler.Filename, handler.Size, handler.Header.Get("Content-Type"), dstPath, encryptedKey)
+	if err != nil {
+		log.Printf("Failed to create attachment record: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to create attachment record")
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
 // WebSocketHandler handles WebSocket connections
 func (h *Handlers) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)

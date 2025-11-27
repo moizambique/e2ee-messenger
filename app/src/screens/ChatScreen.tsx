@@ -10,6 +10,7 @@ import {
   Platform,
   Alert as RNAlert,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { Buffer } from 'buffer';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ const ChatScreen: React.FC = () => {
     loadMessages,
     setCurrentChat,
     sendMessage, 
+    sendFileMessage,
     markMessagesAsRead,
     addMessage,
     clearError 
@@ -105,6 +107,24 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({});
+      if (result.canceled === false) {
+        const { uri, name, mimeType } = result.assets[0];
+        if (mimeType) {
+          // For DMs, isGroup is false
+          await sendFileMessage(participant.id, uri, name, mimeType, false);
+        } else {
+          RNAlert.alert('Error', 'Could not determine file type.');
+        }
+      }
+    } catch (error) {
+      RNAlert.alert('Error', 'Failed to pick document.');
+      console.error(error);
+    }
+  };
+
   const renderStatusIndicator = (status?: Message['status']) => {
     if (!status) return null;
 
@@ -129,25 +149,48 @@ const ChatScreen: React.FC = () => {
     
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
-        <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
-          <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
-            {(() => {
-              try {
-                const decoded = Buffer.from(item.encrypted_content, 'base64').toString('utf-8');
-                const parsed = JSON.parse(decoded);
-                return parsed.content || item.encrypted_content;
-              } catch (e) {
-                return item.encrypted_content;
-              }
-            })()}
-          </Text>          
-          <View style={styles.messageInfo}>
-            <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
-              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-            {isOwn && renderStatusIndicator(item.status)}
+        {item.message_type === 'file' ? (
+          <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble, styles.fileBubble]}>
+            <Ionicons name="document-outline" size={24} color={isOwn ? '#fff' : '#007AFF'} style={styles.fileIcon} />
+            <View style={styles.fileInfo}>
+              <Text style={[styles.fileName, isOwn && styles.ownMessageText]} numberOfLines={1}>
+                {(() => {
+                  try { return JSON.parse(item.encrypted_content).fileName; }
+                  catch (e) { return 'File Attachment'; }
+                })()}
+              </Text>
+              <Text style={[styles.fileSize, isOwn && styles.ownMessageTime]}>
+                {/* File size would go here if available */}
+                Tap to download
+              </Text>
+            </View>
+            <View style={styles.messageInfo}>
+              <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              {isOwn && renderStatusIndicator(item.status)}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
+            <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
+              {(() => {
+                try {
+                  return JSON.parse(Buffer.from(item.encrypted_content, 'base64').toString('utf-8')).content;
+                } catch (e) {
+                  // If it's not JSON, it might be a file metadata string
+                  return item.encrypted_content;
+                }
+              })()}
+            </Text>
+            <View style={styles.textMessageInfo}>
+              <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              {isOwn && renderStatusIndicator(item.status)}
+            </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -192,6 +235,9 @@ const ChatScreen: React.FC = () => {
 
       <View style={styles.inputContainer}>
         <View style={styles.inputWrapper}>
+          <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument}>
+            <Ionicons name="attach" size={24} color="#007AFF" />
+          </TouchableOpacity>
           <TextInput
             style={styles.textInput}
             value={messageText}
@@ -299,12 +345,6 @@ const styles = StyleSheet.create({
   ownMessageText: {
     color: '#fff',
   },
-  messageInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
   messageTime: {
     fontSize: 12,
     color: '#8E8E93',
@@ -329,6 +369,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  attachButton: {
+    padding: 8,
+    marginRight: 4,
   },
   textInput: {
     flex: 1,
@@ -362,6 +406,41 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  fileBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 24, // Add padding to make space for the timestamp
+    position: 'relative',
+  },
+  fileIcon: {
+    marginRight: 12,
+  },
+  fileInfo: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  messageInfo: {
+    position: 'absolute',
+    bottom: 8,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  textMessageInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    // Add padding to text messages to make space for the timestamp
+    paddingTop: 4, 
   },
 });
 

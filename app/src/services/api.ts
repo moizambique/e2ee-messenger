@@ -140,6 +140,51 @@ class ApiService {
     return response.json();
   }
 
+  async uploadAttachment(
+    uri: string,
+    fileName: string,
+    fileType: string,
+    messageId: string,
+    encryptedKey: string
+  ): Promise<void> {
+    const url = `${API_BASE_URL}/messages/attachment`;
+    const formData = new FormData();
+
+    // Append metadata first
+    formData.append('message_id', messageId);
+    formData.append('encrypted_key', encryptedKey);
+
+    // Platform-specific logic for appending the file
+    if (Platform.OS === 'web') {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('attachment', blob, fileName);
+    } else {
+      formData.append('attachment', {
+        uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+    }
+
+    const headers: any = {};
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}: ${response.statusText}` }));
+      throw new Error(errorData.message);
+    }
+    // No JSON body is expected on success (201)
+  }
+
   async deleteAccount(): Promise<void> {
     // Use the generic request helper to ensure the auth token is sent
     return this.request<void>('/profile', {

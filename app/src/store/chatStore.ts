@@ -17,6 +17,7 @@ interface ChatState {
   loadChats: () => Promise<void>;
   loadMessages: (params: { recipientId?: string; groupId?: string; since?: string }) => Promise<void>;
   sendMessage: (targetId: string, content: string, type: 'text' | 'file' | 'system', isGroup: boolean) => Promise<void>;
+  sendFileMessage: (targetId: string, fileUri: string, fileName: string, fileType: string, isGroup: boolean) => Promise<void>;
   setCurrentChat: (chat: Chat | null) => void;
   addMessage: (message: Message) => void;
   updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => void;
@@ -137,6 +138,59 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().updateMessage(tempId, { status: 'failed' });
       set({
         error: error instanceof Error ? error.message : 'Failed to send message',
+      });
+      throw error;
+    }
+  },
+
+  sendFileMessage: async (targetId: string, fileUri: string, fileName: string, fileType: string, isGroup: boolean) => {
+    const { user } = useAuthStore.getState();
+    const tempId = `temp_${Date.now()}`;
+    try {
+      // For this demo, the "encrypted key" is just a placeholder.
+      // In a real app, you'd generate a random key, encrypt the file with it,
+      // then encrypt that key with the session key.
+      const mockEncryptedFileKey = `encrypted_key_for_${fileName}`;
+
+      // The content of a file message is a JSON string with file metadata.
+      const fileMessageContent = JSON.stringify({
+        fileName,
+        fileType,
+        // In a real app, you'd include the file size here.
+      });
+
+      // 1. Send the initial message of type 'file'
+      const sentMessage = await apiService.sendMessage({
+        recipient_id: isGroup ? undefined : targetId,
+        group_id: isGroup ? targetId : undefined,
+        encrypted_content: fileMessageContent, // This is just metadata
+        message_type: 'file',
+      });
+
+      // 2. Optimistically add to UI
+      const tempMessage: Message = {
+        ...sentMessage,
+        id: tempId, // Use a temp ID for UI updates
+        status: 'sending',
+      };
+      get().addMessage(tempMessage);
+
+      // 3. Upload the actual file attachment, linking it to the real message ID
+      await apiService.uploadAttachment(
+        fileUri,
+        fileName,
+        fileType,
+        sentMessage.id,
+        mockEncryptedFileKey
+      );
+
+      // 4. Update the message status to 'sent'
+      get().updateMessage(tempId, { ...sentMessage, status: 'sent' });
+
+    } catch (error) {
+      get().updateMessage(tempId, { status: 'failed' });
+      set({
+        error: error instanceof Error ? error.message : 'Failed to send file',
       });
       throw error;
     }

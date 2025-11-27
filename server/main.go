@@ -107,6 +107,7 @@ func main() {
 			// Messages
 			r.Route("/messages", func(r chi.Router) {
 				r.Post("/", h.SendMessage)
+				r.Post("/attachment", h.UploadAttachment)
 				r.Get("/", h.GetMessages)
 			})
 
