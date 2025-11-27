@@ -226,33 +226,67 @@ func (h *Handlers) GetUsers(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
 
+	// This query is now much more complex. It combines Direct Messages and Group Chats.
 	query := `
-		WITH last_messages AS (
-			SELECT
-				DISTINCT ON (
-					CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END
-				)
-				CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END as participant_id,
-				id,
-				sender_id,
-				recipient_id,
-				encrypted_content,
-				message_type,
-				created_at
-			FROM messages
-			WHERE sender_id = $1 OR recipient_id = $1
-			ORDER BY participant_id, created_at DESC
-		)
+	WITH all_chats AS (
+		-- 1. Get Direct Message (DM) chats
 		SELECT
-			u.id, u.username, u.email, u.created_at, u.updated_at,
-			lm.id, lm.sender_id, lm.recipient_id, lm.encrypted_content, lm.message_type, lm.created_at
-		FROM last_messages lm
-		JOIN users u ON u.id = lm.participant_id
-		ORDER BY lm.created_at DESC;
+			'dm' AS chat_type,
+			CASE WHEN m.sender_id = $1 THEN m.recipient_id ELSE m.sender_id END AS chat_id,
+			m.created_at AS last_message_at,
+			m.id AS message_id,
+			m.encrypted_content,
+			m.message_type
+		FROM messages m
+		WHERE m.group_id IS NULL AND (m.sender_id = $1 OR m.recipient_id = $1)
+
+		UNION ALL
+
+		-- 2. Get Group chats
+		SELECT
+			'group' AS chat_type,
+			gm.group_id AS chat_id,
+			m.created_at AS last_message_at,
+			m.id AS message_id,
+			m.encrypted_content,
+			m.message_type
+		FROM group_members gm
+		LEFT JOIN messages m ON gm.group_id = m.group_id
+		WHERE gm.user_id = $1
+	),
+	latest_chats AS (
+		SELECT
+			DISTINCT ON (chat_id)
+			chat_type,
+			chat_id,
+			last_message_at,
+			message_id,
+			encrypted_content,
+			message_type
+		FROM all_chats
+		ORDER BY chat_id, last_message_at DESC
+	)
+	SELECT
+		lc.chat_type,
+		lc.chat_id,
+		COALESCE(lc.last_message_at, '1970-01-01T00:00:00Z') as last_message_at,
+		u.id AS participant_id,
+		u.username AS participant_username,
+		g.id AS group_id,
+		g.name AS group_name,
+		(SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as participant_count,
+		lc.message_id,
+		lc.encrypted_content,
+		lc.message_type
+	FROM latest_chats lc
+	LEFT JOIN users u ON lc.chat_type = 'dm' AND lc.chat_id = u.id
+	LEFT JOIN groups g ON lc.chat_type = 'group' AND lc.chat_id = g.id
+	ORDER BY last_message_at DESC;
 	`
 
 	rows, err := h.db.Query(query, userID)
 	if err != nil {
+		log.Printf("Error fetching chats: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to fetch chats")
 		return
 	}
@@ -261,19 +295,57 @@ func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
 	var chats []models.Chat
 	for rows.Next() {
 		var chat models.Chat
-		var participant models.User
-		var lastMessage models.Message
-		if err := rows.Scan(&participant.ID, &participant.Username, &participant.Email, &participant.CreatedAt, &participant.UpdatedAt, &lastMessage.ID, &lastMessage.SenderID, &lastMessage.RecipientID, &lastMessage.EncryptedContent, &lastMessage.MessageType, &lastMessage.CreatedAt); err != nil {
+		var chatType string
+		var chatID uuid.UUID
+		var lastMessageAt time.Time
+		var participantID, groupID, messageID sql.NullString
+		var participantUsername, groupName, encryptedContent, messageType sql.NullString
+		var participantCount sql.NullInt64
+
+		err := rows.Scan(
+			&chatType, &chatID, &lastMessageAt,
+			&participantID, &participantUsername,
+			&groupID, &groupName, &participantCount,
+			&messageID, &encryptedContent, &messageType,
+		)
+		if err != nil {
+			log.Printf("Error scanning chat row: %v", err)
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan chat")
 			return
 		}
-		chat.ID = "chat_" + participant.ID.String()
-		chat.Participant = participant
-		chat.LastMessage = &lastMessage
-		chat.UpdatedAt = lastMessage.CreatedAt
-		// Unread count is mocked as 0 for now. A real implementation would require another query.
+
+		chat.Type = chatType
+		chat.ID = chatID.String()
+		chat.UpdatedAt = lastMessageAt
 		chat.UnreadCount = 0
+
+		if chatType == "dm" && participantID.Valid {
+			chat.Name = participantUsername.String
+			chat.Participant = &models.User{
+				ID:       uuid.MustParse(participantID.String),
+				Username: participantUsername.String,
+			}
+		} else if chatType == "group" && groupID.Valid {
+			chat.Name = groupName.String
+			chat.ParticipantCount = int(participantCount.Int64)
+		}
+
+		if messageID.Valid {
+			chat.LastMessage = &models.Message{
+				ID:               uuid.MustParse(messageID.String),
+				EncryptedContent: encryptedContent.String,
+				MessageType:      messageType.String,
+				CreatedAt:        lastMessageAt,
+			}
+		}
+
 		chats = append(chats, chat)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("Error after iterating chat rows: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Error processing chat list")
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -600,6 +672,85 @@ func (h *Handlers) SendReceipt(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(receipt)
+}
+
+// CreateGroup handles the creation of a new group chat
+func (h *Handlers) CreateGroup(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	var req models.CreateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Start a database transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to start database transaction")
+		return
+	}
+	// Defer a rollback in case of error, commit will override this if successful
+	defer tx.Rollback()
+
+	// 1. Create the group
+	group := models.Group{
+		ID:        uuid.New(),
+		Name:      req.Name,
+		CreatedBy: userID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO groups (id, name, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, group.ID, group.Name, group.CreatedBy, group.CreatedAt, group.UpdatedAt)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to create group")
+		return
+	}
+
+	// 2. Add the creator as an admin member
+	_, err = tx.Exec(`
+		INSERT INTO group_members (group_id, user_id, role)
+		VALUES ($1, $2, 'admin')
+	`, group.ID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to add creator to group")
+		return
+	}
+
+	// 3. Add the other members
+	stmt, err := tx.Prepare("INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, 'member')")
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to prepare member insertion")
+		return
+	}
+	defer stmt.Close()
+
+	for _, memberIDStr := range req.MemberIDs {
+		memberID, err := uuid.Parse(memberIDStr)
+		if err != nil {
+			// Skip invalid UUIDs
+			continue
+		}
+		if _, err := stmt.Exec(group.ID, memberID); err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to add member to group")
+			return
+		}
+	}
+
+	// If all went well, commit the transaction
+	if err := tx.Commit(); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to commit transaction")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(group)
 }
 
 // WebSocketHandler handles WebSocket connections

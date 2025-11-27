@@ -16,23 +16,19 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useChatStore } from '../store/chatStore';
 import { useAuth } from '../store/AuthContext';
-import { RootStackParamList, Message } from '../types';
+import { RootStackParamList, Message, Chat } from '../types';
 
-type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
+type GroupChatScreenRouteProp = RouteProp<RootStackParamList, 'GroupChat'>;
 
-const ChatScreen: React.FC = () => {
-  const route = useRoute<ChatScreenRouteProp>();
-  const { participant } = route.params;
+const GroupChatScreen: React.FC = () => {
+  const route = useRoute<GroupChatScreenRouteProp>();
+  const { chat } = route.params;
   const { user } = useAuth();
   const { 
     messages, 
     isLoading, 
     error, 
-    loadMessages,
     setCurrentChat,
-    sendMessage, 
-    markMessagesAsRead,
-    addMessage,
     clearError 
   } = useChatStore();
   
@@ -42,37 +38,13 @@ const ChatScreen: React.FC = () => {
 
   useEffect(() => {
     // Set the current chat when the screen mounts
-    // The chat object can be minimal as long as it has the participant
-    const currentChat = {
-      id: participant.id, // For DMs, the chat ID is the participant's ID
-      type: 'dm' as const,
-      name: participant.username,
-      participant: participant,
-      unread_count: 0, // These are just for type conformity
-      updated_at: new Date().toISOString(),
-    };
-    setCurrentChat(currentChat);
+    setCurrentChat(chat);
 
     // Cleanup: Clear the current chat when the screen unmounts
     return () => {
       setCurrentChat(null);
     };
-  }, [participant, setCurrentChat]);
-
-  useEffect(() => {
-    // When messages change, check for unread messages from the participant
-    // and mark them as read.
-    const unreadMessageIds = messages
-      .filter(msg => 
-        msg.sender_id === participant.id && msg.recipient_id === user?.id &&
-        (!msg.status || msg.status !== 'read') // A more robust check might be needed
-      )
-      .map(msg => msg.id);
-
-    if (unreadMessageIds.length > 0) {
-      markMessagesAsRead(unreadMessageIds);
-    }
-  }, [messages, participant.id, markMessagesAsRead]);
+  }, [chat, setCurrentChat]);
 
   useEffect(() => {
     if (error) {
@@ -83,44 +55,7 @@ const ChatScreen: React.FC = () => {
   }, [error, clearError]);
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || sending) return;
-
-    const text = messageText.trim();
-    setMessageText('');
-    setSending(true);
-
-    try {
-      await sendMessage(participant.id, text, 'text');
-      // Scroll to bottom after sending
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    } catch (error) {
-      // Restore message text on error
-      setMessageText(text);
-      RNAlert.alert('Error', 'Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const renderStatusIndicator = (status?: Message['status']) => {
-    if (!status) return null;
-
-    switch (status) {
-      case 'sending':
-        return <Ionicons name="time-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
-      case 'sent':
-        return <Ionicons name="checkmark-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
-      case 'delivered':
-        return <Ionicons name="checkmark-done-outline" size={14} color="rgba(255, 255, 255, 0.7)" style={styles.statusIcon} />;
-      case 'read':
-        return <Ionicons name="checkmark-done-outline" size={14} color="#4F8EF7" style={styles.statusIcon} />; // A different color for read
-      case 'failed':
-        return <Ionicons name="alert-circle-outline" size={14} color="#FF3B30" style={styles.statusIcon} />;
-      default:
-        return null;
-    }
+    RNAlert.alert('Coming Soon', 'Sending messages in group chats will be implemented next!');
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -129,6 +64,7 @@ const ChatScreen: React.FC = () => {
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
         <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
+          {/* TODO: For group chats, we should show the sender's name if it's not our own message */}
           <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
             {(() => {
               try {
@@ -144,7 +80,7 @@ const ChatScreen: React.FC = () => {
             <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
-            {isOwn && renderStatusIndicator(item.status)}
+            {/* Status indicators are complex for groups, will implement later */}
           </View>
         </View>
       </View>
@@ -153,10 +89,10 @@ const ChatScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="chatbubble-outline" size={60} color="#C7C7CC" />
-      <Text style={styles.emptyTitle}>No messages yet</Text>
+      <Ionicons name="chatbubbles-outline" size={60} color="#C7C7CC" />
+      <Text style={styles.emptyTitle}>Welcome to {chat.name}!</Text>
       <Text style={styles.emptySubtitle}>
-        Start the conversation with {participant.username}
+        Be the first to send a message.
       </Text>
     </View>
   );
@@ -169,17 +105,15 @@ const ChatScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {participant.username.charAt(0).toUpperCase()}
-            </Text>
+            <Ionicons name="people" size={20} color="#fff" />
           </View>
           <View>
-            <Text style={styles.headerName}>{participant.username}</Text>
-            <Text style={styles.headerStatus}>Online</Text>
+            <Text style={styles.headerName}>{chat.name}</Text>
+            <Text style={styles.headerStatus}>{chat.participant_count} members</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="call-outline" size={24} color="#007AFF" />
+          <Ionicons name="ellipsis-horizontal" size={24} color="#007AFF" />
         </TouchableOpacity>
       </View>
 
@@ -190,7 +124,6 @@ const ChatScreen: React.FC = () => {
         renderItem={renderMessage}
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={messages.length === 0 ? styles.emptyContainer : styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
       <View style={styles.inputContainer}>
@@ -199,7 +132,7 @@ const ChatScreen: React.FC = () => {
             style={styles.textInput}
             value={messageText}
             onChangeText={setMessageText}
-            placeholder={`Message ${participant.username}...`}
+            placeholder={`Message ${chat.name}...`}
             multiline
             maxLength={1000}
             editable={!sending}
@@ -250,11 +183,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   headerName: {
     fontSize: 18,
     fontWeight: '600',
@@ -262,7 +190,7 @@ const styles = StyleSheet.create({
   },
   headerStatus: {
     fontSize: 14,
-    color: '#34C759',
+    color: '#8E8E93',
     marginTop: 2,
   },
   headerButton: {
@@ -315,9 +243,6 @@ const styles = StyleSheet.create({
   ownMessageTime: {
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  statusIcon: {
-    marginLeft: 4,
-  },
   inputContainer: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
@@ -368,4 +293,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChatScreen;
+export default GroupChatScreen;

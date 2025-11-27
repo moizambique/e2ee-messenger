@@ -94,10 +94,12 @@ const createMessagesTable = `
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
     encrypted_content TEXT NOT NULL,
     message_type VARCHAR(50) NOT NULL DEFAULT 'text',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT chk_recipient_or_group CHECK (recipient_id IS NOT NULL OR group_id IS NOT NULL)
 );
 `
 

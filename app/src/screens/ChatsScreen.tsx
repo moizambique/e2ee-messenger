@@ -37,9 +37,15 @@ const ChatsScreen: React.FC = () => {
   };
 
   const handleChatPress = (chat: Chat) => {
-    navigation.navigate('Chat', {
-      participant: chat.participant,
-    });
+    if (chat.type === 'dm' && chat.participant) {
+      navigation.navigate('Chat', { participant: chat.participant });
+    } else if (chat.type === 'group') {
+      navigation.navigate('GroupChat', { chat });
+    }
+  };
+
+  const handleCreateGroup = () => {
+    navigation.navigate('CreateGroup');
   };
 
   const renderChatItem = ({ item }: { item: Chat }) => (
@@ -48,14 +54,17 @@ const ChatsScreen: React.FC = () => {
       onPress={() => handleChatPress(item)}
     >
       <View style={styles.avatar}>
+        {item.type === 'group' && <Ionicons name="people" size={24} color="#fff" />}
+        {item.type === 'dm' && 
         <Text style={styles.avatarText}>
-          {item.participant.username.charAt(0).toUpperCase()}
+            {item.name.charAt(0).toUpperCase()}
         </Text>
+        }
       </View>
       
       <View style={styles.chatContent}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{item.participant.username}</Text>
+          <Text style={styles.chatName}>{item.name}</Text>
           <Text style={styles.chatTime}>
             {item.last_message
               ? new Date(item.last_message.created_at).toLocaleTimeString([], { 
@@ -110,7 +119,7 @@ const ChatsScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
-        <TouchableOpacity style={styles.headerButton}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleCreateGroup}>
           <Ionicons name="add" size={24} color="#007AFF" />
         </TouchableOpacity>
       </View>

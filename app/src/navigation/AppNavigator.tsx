@@ -15,6 +15,8 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import DeviceKeysScreen from '../screens/DeviceKeysScreen';
 import { RootStackParamList, MainTabParamList } from '../types';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -82,6 +84,15 @@ const AppNavigator: React.FC = () => {
             }}
           />
           <Stack.Screen 
+            name="GroupChat" 
+            component={GroupChatScreen}
+            options={{
+              headerShown: true,
+              title: 'Group Chat',
+              headerBackTitle: 'Back'
+            }}
+          />
+          <Stack.Screen 
             name="KeyVerification" 
             component={KeyVerificationScreen}
             options={{ 
@@ -121,6 +132,14 @@ const AppNavigator: React.FC = () => {
             name="DeviceKeys" 
             component={DeviceKeysScreen}
             options={{ headerShown: true, title: 'Device Keys', headerBackTitle: 'Settings' }}
+          />
+          <Stack.Screen
+            name="CreateGroup"
+            component={CreateGroupScreen}
+            options={{
+              headerShown: false,
+              presentation: 'modal',
+            }}
           />
         </>
       )}

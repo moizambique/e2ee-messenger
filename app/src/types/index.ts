@@ -46,10 +46,13 @@ export interface Receipt {
 
 export interface Chat {
   id: string;
-  participant: User;
+  type: 'dm' | 'group';
+  name: string; // For groups, this is the group name. For DMs, the participant's name.
+  participant?: User; // Only for DMs
   last_message?: Message;
   unread_count: number;
   updated_at: string;
+  participant_count?: number; // For groups
 }
 
 export interface AuthResponse {
@@ -71,6 +74,11 @@ export interface LoginRequest {
 
 export interface UpdateProfileRequest {
   username: string;
+}
+
+export interface CreateGroupRequest {
+  name: string;
+  member_ids: string[];
 }
 
 export interface SendMessageRequest {
@@ -125,11 +133,13 @@ export type RootStackParamList = {
   Main: undefined;
   Chat: { participant: User };
   Settings: undefined;
+  GroupChat: { chat: Chat };
   Profile: undefined;
   Notifications: undefined;
   Privacy: undefined;
   DeviceKeys: undefined;
   KeyVerification: { userId: string; deviceId: string };
+  CreateGroup: undefined;
 };
 
 export type AuthStackParamList = {

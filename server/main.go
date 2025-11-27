@@ -87,6 +87,9 @@ func main() {
 			r.Get("/users", h.GetUsers)
 			r.Get("/chats", h.GetChats)
 
+			// Groups
+			r.Post("/groups", h.CreateGroup)
+
 			// Key management
 			r.Route("/keys", func(r chi.Router) {
 				r.Post("/device", h.UploadDeviceKey)

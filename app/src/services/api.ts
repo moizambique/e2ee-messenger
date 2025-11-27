@@ -11,7 +11,8 @@ import {
   SendReceiptRequest,
   User,
   UpdateProfileRequest,
-  Chat
+  Chat,
+  CreateGroupRequest
 } from '../types';
 
 const API_BASE_URL = __DEV__ 
@@ -83,6 +84,14 @@ class ApiService {
 
   async getChats(): Promise<Chat[]> {
     return this.request<Chat[]>('/chats');
+  }
+
+  // Group endpoints
+  async createGroup(data: CreateGroupRequest): Promise<Chat> { // Assuming group creation returns a Chat-like object
+    return this.request<Chat>('/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // Key management endpoints

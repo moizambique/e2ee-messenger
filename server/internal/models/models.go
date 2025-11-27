@@ -18,11 +18,14 @@ type User struct {
 
 // Chat represents a conversation in the chat list
 type Chat struct {
-	ID          string    `json:"id"`
-	Participant User      `json:"participant"`
-	LastMessage *Message  `json:"last_message,omitempty"`
-	UnreadCount int       `json:"unread_count"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	Type             string    `json:"type"`
+	Name             string    `json:"name"`
+	Participant      *User     `json:"participant,omitempty"`
+	LastMessage      *Message  `json:"last_message,omitempty"`
+	UnreadCount      int       `json:"unread_count"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	ParticipantCount int       `json:"participant_count,omitempty"`
 }
 
 // DeviceKey represents a device's identity key
@@ -114,6 +117,12 @@ type LoginRequest struct {
 // UpdateProfileRequest represents a user profile update request
 type UpdateProfileRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
+}
+
+// CreateGroupRequest represents a request to create a new group
+type CreateGroupRequest struct {
+	Name      string   `json:"name" validate:"required,min=1,max=255"`
+	MemberIDs []string `json:"member_ids" validate:"required,min=1"`
 }
 
 // AuthResponse represents an authentication response

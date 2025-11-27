@@ -65,7 +65,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const incomingMessage = message.payload;
             
             // Only add the message if it belongs to the current open chat
-            if (currentChat && incomingMessage.sender_id === currentChat.participant.id) {
+            if (currentChat && currentChat.type === 'dm' && currentChat.participant && incomingMessage.sender_id === currentChat.participant.id) {
+              addMessage(incomingMessage);
+            } else if (currentChat && currentChat.type === 'group' && incomingMessage.group_id === currentChat.id) {
+              // Add message if it's for the currently open group chat
               addMessage(incomingMessage);
             }
             // TODO: In the future, if the chat is not open, update the chat list with unread count.

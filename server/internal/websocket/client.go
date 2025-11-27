@@ -60,11 +60,11 @@ func (c *Client) readPump() {
 	// Set read limit
 	c.conn.SetReadLimit(maxMessageSize)
 
-	// Set read timeout
-	ctx, cancel := context.WithTimeout(context.Background(), pongWait)
-	defer cancel()
-
 	for {
+		// Set read timeout for each read
+		ctx, cancel := context.WithTimeout(context.Background(), pongWait)
+		defer cancel()
+
 		var msg Message
 		err := wsjson.Read(ctx, c.conn, &msg)
 		if err != nil {
@@ -93,10 +93,6 @@ func (c *Client) readPump() {
 		default:
 			log.Printf("Unknown message type from user %s: %s", c.userID, msg.Type)
 		}
-
-		// Reset context for next read
-		cancel()
-		ctx, cancel = context.WithTimeout(context.Background(), pongWait)
 	}
 }
 

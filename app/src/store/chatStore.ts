@@ -138,7 +138,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setCurrentChat: (chat: Chat | null) => {
     set({ currentChat: chat });
-    if (chat) {
+    if (chat && chat.type === 'dm' && chat.participant) {
       get().loadMessages(chat.participant.id);
     } else {
       get().clearMessages();
