@@ -1,4 +1,5 @@
-import { 
+import { Platform } from 'react-native';
+import {
   AuthResponse, 
   SignupRequest, 
   LoginRequest, 
@@ -16,7 +17,7 @@ import {
   ChangePasswordRequest
 } from '../types';
 
-const API_BASE_URL = __DEV__ 
+export const API_BASE_URL = __DEV__ 
   ? 'http://localhost:8080/v1' 
   : 'https://your-production-api.com/v1';
 
@@ -92,6 +93,51 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  async uploadAvatar(uri: string): Promise<{ avatar_url: string }> {
+    const url = `${API_BASE_URL}/profile/avatar`;
+    const fileType = uri.split('.').pop();
+    const fileName = `photo.${fileType}`;
+    const fileMimeType = `image/${fileType}`;
+
+    const formData = new FormData();
+
+    // Platform-specific logic for creating the form data
+    if (Platform.OS === 'web') {
+      // On web, we need to fetch the blob from the URI
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('avatar', blob, fileName);
+    } else {
+      // On native, we use the React Native-specific object
+      formData.append('avatar', {
+        uri,
+        name: fileName,
+        type: fileMimeType,
+      } as any);
+    }
+
+    const headers: any = {
+      // Do NOT set 'Content-Type': 'multipart/form-data'.
+      // React Native's fetch will do this automatically and add the boundary.
+    };
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}: ${response.statusText}` }));
+      throw new Error(errorData.message);
+    }
+
+    return response.json();
   }
 
   async deleteAccount(): Promise<void> {

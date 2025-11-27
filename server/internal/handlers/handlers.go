@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -190,6 +193,63 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedUser)
+}
+
+// UploadAvatar handles uploading a new profile picture for the current user
+func (h *Handlers) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	// 1. Parse the multipart form data (max 10MB)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		respondWithError(w, http.StatusBadRequest, "File too large")
+		return
+	}
+
+	// 2. Get the file from the form
+	file, handler, err := r.FormFile("avatar")
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid file upload")
+		return
+	}
+	defer file.Close()
+
+	// 3. Create the uploads directory if it doesn't exist
+	uploadsDir := "./uploads"
+	if _, err := os.Stat(uploadsDir); os.IsNotExist(err) {
+		os.Mkdir(uploadsDir, 0755)
+	}
+
+	// 4. Create a unique filename and destination file
+	ext := filepath.Ext(handler.Filename)
+	if ext == "" {
+		ext = ".jpg" // Default extension
+	}
+	fileName := fmt.Sprintf("%s%s", userID.String(), ext)
+	dstPath := filepath.Join(uploadsDir, fileName)
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save file")
+		return
+	}
+	defer dst.Close()
+
+	// 5. Copy the uploaded file to the destination
+	if _, err := io.Copy(dst, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save file content")
+		return
+	}
+
+	// 6. Update the user's avatar_url in the database
+	avatarURL := fmt.Sprintf("/uploads/%s", fileName)
+	_, err = h.db.Exec("UPDATE users SET avatar_url = $1, updated_at = $2 WHERE id = $3", avatarURL, time.Now(), userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update user profile")
+		return
+	}
+
+	// 7. Respond with the new URL
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"avatar_url": avatarURL})
 }
 
 // ChangePassword handles updating the current user's password

@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import CustomAlert from './CustomAlert';
 import Avatar from '../types/Avatar';
 
 const ProfileScreen: React.FC = () => {
-  const { user, updateProfile, changePassword, isLoading } = useAuth();
+  const { user, updateProfile, uploadAvatar, changePassword, isLoading } = useAuth();
   const usernameInputRef = useRef<TextInput>(null);
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -57,10 +58,29 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleEditPhoto = () => {
-    showAlert('Coming Soon', 'Changing your profile picture will be available in a future update.', [
-      { text: 'OK', onPress: () => {} },
-    ]);
+  const handleEditPhoto = async () => {
+    // Request permission to access the media library
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permissionResult.granted === false) {
+      showAlert('Permission Required', 'You need to grant permission to access your photos to change your profile picture.', [{ text: 'OK', onPress: () => {} }]);
+      return;
+    }
+
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (pickerResult.canceled) {
+      return;
+    }
+
+    const uri = pickerResult.assets[0].uri;
+    if (uri) {
+      await uploadAvatar(uri);
+    }
   };
 
   const handleEditUsername = () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { API_BASE_URL } from '../services/api';
 
 interface AvatarProps {
   name: string;
@@ -21,7 +22,12 @@ const Avatar: React.FC<AvatarProps> = ({ name, avatarUrl, size, isGroup }) => {
   }
 
   if (avatarUrl) {
-    return <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />;
+    // Construct the full URL if it's a relative path from the server
+    const fullAvatarUrl = avatarUrl.startsWith('http') 
+      ? avatarUrl 
+      : `${API_BASE_URL.replace('/v1', '')}${avatarUrl}`;
+      
+    return <Image source={{ uri: fullAvatarUrl }} style={styles.avatarImage} />;
   }
 
   return (

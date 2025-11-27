@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  uploadAvatar: (uri: string) => Promise<void>;
   changePassword: (data: ChangePasswordRequest) => Promise<void>;
   deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
@@ -38,6 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     updateProfile,
+    uploadAvatar,
     changePassword,
     deleteAccount,
     logout,
@@ -104,6 +106,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     updateProfile,
+    uploadAvatar,
     changePassword,
     deleteAccount,
     logout,

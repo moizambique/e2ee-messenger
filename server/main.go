@@ -67,6 +67,10 @@ func main() {
 		MaxAge:           300,
 	}))
 
+	// Serve static files from the "uploads" directory
+	fs := http.FileServer(http.Dir("uploads"))
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", fs))
+
 	// API routes
 	r.Route("/v1", func(r chi.Router) {
 		// Auth routes
@@ -82,6 +86,7 @@ func main() {
 
 			// Profile
 			r.Put("/profile", h.UpdateProfile)
+			r.Post("/profile/avatar", h.UploadAvatar)
 			r.Delete("/profile", h.DeleteAccount)
 			r.Put("/profile/password", h.ChangePassword)
 
