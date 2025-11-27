@@ -120,6 +120,12 @@ type UpdateProfileRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
 }
 
+// ChangePasswordRequest represents a password change request
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
+
 // CreateGroupRequest represents a request to create a new group
 type CreateGroupRequest struct {
 	Name      string   `json:"name" validate:"required,min=1,max=255"`

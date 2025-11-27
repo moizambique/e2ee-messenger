@@ -192,6 +192,43 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedUser)
 }
 
+// ChangePassword handles updating the current user's password
+func (h *Handlers) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	var req models.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// 1. Fetch current user to get their current hashed password
+	var currentUser models.User
+	err := h.db.QueryRow("SELECT password FROM users WHERE id = $1", userID).Scan(&currentUser.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve user data")
+		return
+	}
+
+	// 2. Verify the old password
+	if !verifyPassword(req.OldPassword, currentUser.Password) {
+		respondWithError(w, http.StatusUnauthorized, "Incorrect current password")
+		return
+	}
+
+	// 3. Hash the new password
+	newHashedPassword := hashPassword(req.NewPassword)
+
+	// 4. Update the password in the database
+	_, err = h.db.Exec("UPDATE users SET password = $1, updated_at = $2 WHERE id = $3", newHashedPassword, time.Now(), userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update password")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // DeleteAccount handles the permanent deletion of a user's account
 func (h *Handlers) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)

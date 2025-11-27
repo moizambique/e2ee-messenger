@@ -59,7 +59,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleHelpAndSupport = () => {
-    showAlert('Coming Soon', 'The help and support section will be available in a future update.', [
+    showAlert('Help & Support', 'Reach out to us using the following:\nPhone Number: (505) 503-4455\nEmail: e2eemessenger@gmail.com', [
       { text: 'OK', onPress: () => {} },
     ]);
   };

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, AuthResponse, UpdateProfileRequest } from '../types';
+import { User, AuthResponse, UpdateProfileRequest, ChangePasswordRequest } from '../types';
 import { apiService } from '../services/api';
 import { clearAll } from '../crypto/crypto';
 
@@ -18,6 +18,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  changePassword: (data: ChangePasswordRequest) => Promise<void>;
   deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
   setError: (error: string | null) => void;
@@ -105,6 +106,22 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Profile update failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          // Re-throw to be caught in the component
+          throw new Error(errorMessage);
+        }
+      },
+
+      changePassword: async (data: ChangePasswordRequest) => {
+        set({ isLoading: true, error: null });
+        try {
+          await apiService.changePassword(data);
+          set({ isLoading: false, error: null });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Password change failed';
           set({
             isLoading: false,
             error: errorMessage,

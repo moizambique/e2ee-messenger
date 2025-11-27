@@ -3,7 +3,7 @@ import { useAuthStore } from './authStore';
 import { useChatStore } from './chatStore';
 import { webSocketService } from '../services/websocket';
 import { apiService } from '../services/api';
-import { UpdateProfileRequest } from '../types';
+import { UpdateProfileRequest, ChangePasswordRequest } from '../types';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  changePassword: (data: ChangePasswordRequest) => Promise<void>;
   deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -37,6 +38,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     updateProfile,
+    changePassword,
     deleteAccount,
     logout,
     clearError,
@@ -102,6 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     signup,
     updateProfile,
+    changePassword,
     deleteAccount,
     logout,
     clearError,

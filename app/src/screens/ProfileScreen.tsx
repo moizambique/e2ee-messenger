@@ -12,7 +12,7 @@ import { useAuth } from '../store/AuthContext';
 import CustomAlert from './CustomAlert';
 
 const ProfileScreen: React.FC = () => {
-  const { user, updateProfile, isLoading } = useAuth();
+  const { user, updateProfile, changePassword, isLoading } = useAuth();
   const usernameInputRef = useRef<TextInput>(null);
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -20,7 +20,16 @@ const ProfileScreen: React.FC = () => {
 
   // State for editable fields
   const [username, setUsername] = useState(user?.username || '');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
 
   const showAlert = (title: string, message: string, buttons: any[]) => {
     setAlertConfig({ title, message, buttons });
@@ -57,6 +66,34 @@ const ProfileScreen: React.FC = () => {
     setIsEditingUsername(true);
     // Focus the input field after a short delay
     setTimeout(() => usernameInputRef.current?.focus(), 100);
+  };
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      showAlert('Error', 'Please fill in all password fields.', [{ text: 'OK', onPress: () => {} }]);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showAlert('Error', 'New passwords do not match.', [{ text: 'OK', onPress: () => {} }]);
+      return;
+    }
+    if (newPassword.length < 8) {
+      showAlert('Error', 'New password must be at least 8 characters long.', [{ text: 'OK', onPress: () => {} }]);
+      return;
+    }
+
+    try {
+      await changePassword({ old_password: oldPassword, new_password: newPassword });
+      showAlert('Success', 'Your password has been changed successfully.', [{ text: 'OK', onPress: () => {} }]);
+      setIsChangingPassword(false);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      showAlert('Password Change Failed', error instanceof Error ? error.message : 'An unknown error occurred.', [
+        { text: 'OK', onPress: () => {} },
+      ]);
+    }
   };
 
   return (
@@ -113,11 +150,73 @@ const ProfileScreen: React.FC = () => {
         </View>
       </View>
 
-      {isEditingUsername && !isLoading && (
+      {isEditingUsername && (
         <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges} disabled={isLoading}>
           <Text style={styles.saveButtonText}>
             {isLoading ? 'Saving...' : 'Save Changes'}
           </Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.section}>
+        {!isChangingPassword ? (
+          <TouchableOpacity style={styles.changePasswordButton} onPress={() => setIsChangingPassword(true)}>
+            <Text style={styles.changePasswordButtonText}>Change Password</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Current Password</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry={!showOldPassword}
+                  value={oldPassword}
+                  onChangeText={setOldPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity onPress={() => setShowOldPassword(!showOldPassword)} style={styles.editButton}>
+                  <Ionicons name={showOldPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>New Password</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry={!showNewPassword}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.editButton}>
+                  <Ionicons name={showNewPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Confirm New Password</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.editButton}>
+                  <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        )}
+      </View>
+
+      {isChangingPassword && (
+        <TouchableOpacity style={styles.saveButton} onPress={handleChangePassword} disabled={isLoading}>
+          <Text style={styles.saveButtonText}>{isLoading ? 'Saving...' : 'Update Password'}</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -212,6 +311,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  changePasswordButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  changePasswordButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '500',
   },
 });
 

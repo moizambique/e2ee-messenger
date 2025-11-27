@@ -12,7 +12,8 @@ import {
   User,
   UpdateProfileRequest,
   Chat,
-  CreateGroupRequest
+  CreateGroupRequest,
+  ChangePasswordRequest
 } from '../types';
 
 const API_BASE_URL = __DEV__ 
@@ -81,6 +82,13 @@ class ApiService {
   // Profile endpoint
   async updateProfile(data: UpdateProfileRequest): Promise<User> {
     return this.request<User>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async changePassword(data: ChangePasswordRequest): Promise<void> {
+    return this.request<void>('/profile/password', {
       method: 'PUT',
       body: JSON.stringify(data),
     });

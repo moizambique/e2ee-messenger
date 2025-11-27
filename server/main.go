@@ -83,6 +83,7 @@ func main() {
 			// Profile
 			r.Put("/profile", h.UpdateProfile)
 			r.Delete("/profile", h.DeleteAccount)
+			r.Put("/profile/password", h.ChangePassword)
 
 			// Users & Chats
 			r.Get("/users", h.GetUsers)

@@ -77,6 +77,11 @@ export interface UpdateProfileRequest {
   username: string;
 }
 
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+}
+
 export interface CreateGroupRequest {
   name: string;
   member_ids: string[];
