@@ -10,12 +10,16 @@ import {
   Platform,
   Alert as RNAlert,
 } from 'react-native';
+import { Linking } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Buffer } from 'buffer';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useChatStore } from '../store/chatStore';
+import { apiService } from '../services/api';
 import { useAuth } from '../store/AuthContext';
 import Avatar from '../types/Avatar';
 import { RootStackParamList, Message } from '../types';
@@ -125,6 +129,48 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  const handleDownloadAttachment = async (message: Message) => {
+    try {
+      const fileInfo = JSON.parse(message.encrypted_content);
+      const { fileName } = fileInfo;
+      if (!fileName) {
+        RNAlert.alert('Error', 'File information is missing.');
+        return;
+      }
+
+      const baseUrl = apiService.getAttachmentDownloadUrl(message.id, fileName);
+      const token = apiService.getToken();
+
+      if (Platform.OS === 'web') {
+        // On web, we open the URL with the token as a query param.
+        // The backend middleware is set up to handle this.
+        const downloadUrlWithToken = `${baseUrl}?token=${token}`;
+        Linking.openURL(downloadUrlWithToken);
+      } else {
+        // Native platform logic
+        const localUri = FileSystem.documentDirectory + fileName;
+
+        RNAlert.alert('Downloading', `Downloading ${fileName}...`);
+
+        const { uri } = await FileSystem.downloadAsync(baseUrl, localUri, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log('Finished downloading to ', uri);
+
+        // Share the downloaded file if sharing is available
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri);
+        }
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      RNAlert.alert('Download Failed', 'Could not download the attachment.');
+    }
+  };
+
   const renderStatusIndicator = (status?: Message['status']) => {
     if (!status) return null;
 
@@ -150,27 +196,32 @@ const ChatScreen: React.FC = () => {
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
         {item.message_type === 'file' ? (
-          <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble, styles.fileBubble]}>
-            <Ionicons name="document-outline" size={24} color={isOwn ? '#fff' : '#007AFF'} style={styles.fileIcon} />
-            <View style={styles.fileInfo}>
-              <Text style={[styles.fileName, isOwn && styles.ownMessageText]} numberOfLines={1}>
-                {(() => {
-                  try { return JSON.parse(item.encrypted_content).fileName; }
-                  catch (e) { return 'File Attachment'; }
-                })()}
-              </Text>
-              <Text style={[styles.fileSize, isOwn && styles.ownMessageTime]}>
-                {/* File size would go here if available */}
-                Tap to download
-              </Text>
+          <TouchableOpacity
+            onPress={() => handleDownloadAttachment(item)}
+            style={isOwn ? styles.touchableOwn : styles.touchableOther}
+          >
+            <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble, styles.fileBubble]}>
+              <Ionicons name="document-outline" size={24} color={isOwn ? '#fff' : '#007AFF'} style={styles.fileIcon} />
+              <View style={styles.fileInfo}>
+                <Text style={[styles.fileName, isOwn && styles.ownMessageText]} numberOfLines={1}>
+                  {(() => {
+                    try { return JSON.parse(item.encrypted_content).fileName; }
+                    catch (e) { return 'File Attachment'; }
+                  })()}
+                </Text>
+                <Text style={[styles.fileSize, isOwn && styles.ownMessageTime]}>
+                  {/* File size would go here if available */}
+                  Tap to download
+                </Text>
+              </View>
+              <View style={styles.messageInfo}>
+                <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {isOwn && renderStatusIndicator(item.status)}
+              </View>
             </View>
-            <View style={styles.messageInfo}>
-              <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
-                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              {isOwn && renderStatusIndicator(item.status)}
-            </View>
-          </View>
+          </TouchableOpacity>
         ) : (
           <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
             <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
@@ -417,7 +468,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   fileInfo: {
-    flex: 1,
+    // Use flexShrink to prevent it from pushing the timestamp out of the bubble
+    flexShrink: 1,
   },
   fileName: {
     fontSize: 16,
@@ -439,8 +491,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-end',
     marginTop: 4,
-    // Add padding to text messages to make space for the timestamp
-    paddingTop: 4, 
+    paddingTop: 4,
+  },
+  touchableOwn: {
+    alignItems: 'flex-end',
+  },
+  touchableOther: {
+    alignItems: 'flex-start',
   },
 });
 

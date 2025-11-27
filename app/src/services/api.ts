@@ -28,6 +28,10 @@ class ApiService {
     this.token = token;
   }
 
+  getToken(): string | null {
+    return this.token;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -183,6 +187,10 @@ class ApiService {
       throw new Error(errorData.message);
     }
     // No JSON body is expected on success (201)
+  }
+
+  getAttachmentDownloadUrl(messageId: string, fileName: string): string {
+    return `${API_BASE_URL}/messages/attachment/${messageId}/${encodeURIComponent(fileName)}`;
   }
 
   async deleteAccount(): Promise<void> {

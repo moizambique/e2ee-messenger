@@ -43,6 +43,8 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "expo-document-picker": "~11.10.1"
+    "expo-document-picker": "~11.10.1",
+    "expo-file-system": "~16.0.9",
+    "expo-sharing": "~11.10.0"
   }
 }

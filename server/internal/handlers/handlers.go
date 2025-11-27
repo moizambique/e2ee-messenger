@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"e2ee-messenger/server/internal/config"
 	"e2ee-messenger/server/internal/database"
 	"e2ee-messenger/server/internal/middleware"
@@ -1021,6 +1023,77 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+// DownloadAttachment serves a file for download
+func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	messageIDStr := chi.URLParam(r, "messageID")
+	fileName := chi.URLParam(r, "fileName")
+
+	if messageIDStr == "" || fileName == "" {
+		respondWithError(w, http.StatusBadRequest, "messageID and fileName are required")
+		return
+	}
+
+	messageID, err := uuid.Parse(messageIDStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid messageID format")
+		return
+	}
+
+	// 1. Fetch attachment details and message participants from DB
+	var storagePath, mimeType string
+	var senderID, recipientID, groupID sql.NullString // Use sql.NullString for nullable UUIDs
+
+	err = h.db.QueryRow(`
+		SELECT a.storage_path, a.mime_type, m.sender_id, m.recipient_id, m.group_id
+		FROM attachments a
+		JOIN messages m ON a.message_id = m.id
+		WHERE a.message_id = $1 AND a.file_name = $2
+	`, messageID, fileName).Scan(&storagePath, &mimeType, &senderID, &recipientID, &groupID)
+
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Attachment not found")
+		return
+	}
+	if err != nil {
+		log.Printf("Error fetching attachment details: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve attachment")
+		return
+	}
+
+	// 2. Authorization Check: Verify the user is part of the conversation
+	isAuthorized := false
+	if groupID.Valid { // Group Message
+		var memberCount int
+		err = h.db.QueryRow("SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND user_id = $2", groupID.String, userID).Scan(&memberCount)
+		if err == nil && memberCount > 0 {
+			isAuthorized = true
+		}
+	} else if senderID.Valid && recipientID.Valid { // Direct Message
+		if senderID.String == userID.String() || recipientID.String == userID.String() {
+			isAuthorized = true
+		}
+	}
+
+	if !isAuthorized {
+		respondWithError(w, http.StatusForbidden, "You are not authorized to download this attachment")
+		return
+	}
+
+	// 3. Serve the file
+	// Set headers to prompt download
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
+	w.Header().Set("Content-Type", mimeType)
+
+	// Check if file exists before serving
+	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
+		respondWithError(w, http.StatusNotFound, "File not found on server")
+		return
+	}
+
+	http.ServeFile(w, r, storagePath)
 }
 
 // WebSocketHandler handles WebSocket connections
