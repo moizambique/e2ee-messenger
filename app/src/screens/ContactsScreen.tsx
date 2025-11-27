@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { useChatStore } from '../store/chatStore';
 import { RootStackParamList, User, Chat } from '../types';
+import Avatar from '../types/Avatar';
 import { apiService } from '../services/api';
 
 type ContactsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
@@ -110,11 +111,7 @@ const ContactsScreen: React.FC = () => {
       style={styles.contactItem}
       onPress={() => handleContactPress(item)}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>
-          {item.username.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <Avatar name={item.username} avatarUrl={item.avatar_url} size={50} />
       
       <View style={styles.contactContent}>
         <Text style={styles.contactName}>{item.username}</Text>
@@ -246,6 +243,7 @@ const styles = StyleSheet.create({
   },
   contactContent: {
     flex: 1,
+    marginLeft: 16,
   },
   contactName: {
     fontSize: 16,

@@ -34,6 +34,7 @@ func main() {
 			ID:        uuid.New(),
 			Username:  "alice",
 			Email:     "alice@example.com",
+			AvatarURL: "https://picsum.photos/seed/alice/200",
 			Password:  hashPassword("password123"),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -42,6 +43,7 @@ func main() {
 			ID:        uuid.New(),
 			Username:  "bob",
 			Email:     "bob@example.com",
+			AvatarURL: "https://picsum.photos/seed/bob/200",
 			Password:  hashPassword("password123"),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -51,10 +53,10 @@ func main() {
 	// Insert users
 	for _, user := range users {
 		_, err := db.Exec(`
-			INSERT INTO users (id, username, email, password, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO users (id, username, email, password, avatar_url, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (email) DO NOTHING
-		`, user.ID, user.Username, user.Email, user.Password, user.CreatedAt, user.UpdatedAt)
+		`, user.ID, user.Username, user.Email, user.Password, user.AvatarURL, user.CreatedAt, user.UpdatedAt)
 		if err != nil {
 			log.Printf("Failed to insert user %s: %v", user.Username, err)
 		} else {

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useChatStore } from '../store/chatStore';
 import { useAuth } from '../store/AuthContext';
+import Avatar from '../types/Avatar';
 import { RootStackParamList, Message } from '../types';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -168,12 +169,8 @@ const ChatScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <View style={styles.headerInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {participant.username.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View>
+          <Avatar name={participant.username} avatarUrl={participant.avatar_url} size={40} />
+          <View style={{ marginLeft: 12 }}>
             <Text style={styles.headerName}>{participant.username}</Text>
             <Text style={styles.headerStatus}>Online</Text>
           </View>

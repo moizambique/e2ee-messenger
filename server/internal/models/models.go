@@ -11,6 +11,7 @@ type User struct {
 	ID        uuid.UUID `json:"id" db:"id"`
 	Username  string    `json:"username" db:"username"`
 	Email     string    `json:"email" db:"email"`
+	AvatarURL string    `json:"avatar_url,omitempty" db:"avatar_url"`
 	Password  string    `json:"-" db:"password"` // Never expose password in JSON
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`

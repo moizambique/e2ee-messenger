@@ -15,6 +15,7 @@ import { Buffer } from 'buffer';
 
 import { useAuth } from '../store/AuthContext';
 import { useChatStore } from '../store/chatStore';
+import Avatar from '../types/Avatar';
 import { RootStackParamList, Chat, User } from '../types';
 
 type ChatsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
@@ -53,14 +54,11 @@ const ChatsScreen: React.FC = () => {
       style={styles.chatItem} 
       onPress={() => handleChatPress(item)}
     >
-      <View style={styles.avatar}>
-        {item.type === 'group' && <Ionicons name="people" size={24} color="#fff" />}
-        {item.type === 'dm' && 
-        <Text style={styles.avatarText}>
-            {item.name.charAt(0).toUpperCase()}
-        </Text>
-        }
-      </View>
+      <Avatar 
+        name={item.name} 
+        avatarUrl={item.participant?.avatar_url} 
+        size={50} 
+        isGroup={item.type === 'group'} />
       
       <View style={styles.chatContent}>
         <View style={styles.chatHeader}>
@@ -191,6 +189,7 @@ const styles = StyleSheet.create({
   },
   chatContent: {
     flex: 1,
+    marginLeft: 16,
   },
   chatHeader: {
     flexDirection: 'row',

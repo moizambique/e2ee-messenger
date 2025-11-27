@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import CustomAlert from './CustomAlert';
+import Avatar from '../types/Avatar';
 
 const ProfileScreen: React.FC = () => {
   const { user, updateProfile, changePassword, isLoading } = useAuth();
@@ -107,11 +108,7 @@ const ProfileScreen: React.FC = () => {
       />
       <View style={styles.header}>
         <TouchableOpacity style={styles.avatarContainer} onPress={handleEditPhoto}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.username?.charAt(0).toUpperCase() || 'U'}
-            </Text>
-          </View>
+          <Avatar name={user?.username || 'U'} avatarUrl={user?.avatar_url} size={100} />
           <View style={styles.cameraIconContainer}>
             <Ionicons name="camera" size={20} color="#fff" />
           </View>

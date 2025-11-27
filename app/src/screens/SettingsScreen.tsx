@@ -12,6 +12,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../store/AuthContext';
 import CustomAlert from './CustomAlert';
+import Avatar from '../types/Avatar';
 import { RootStackParamList } from '../types';
 
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
@@ -116,11 +117,7 @@ const SettingsScreen: React.FC = () => {
         onClose={() => setAlertVisible(false)}
       />
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.username?.charAt(0).toUpperCase() || 'U'}
-          </Text>
-        </View>
+        <Avatar name={user?.username || 'U'} avatarUrl={user?.avatar_url} size={80} />
         <Text style={styles.userName}>{user?.username || 'User'}</Text>
         <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
       </View>

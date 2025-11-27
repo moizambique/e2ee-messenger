@@ -110,9 +110,9 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	// Find user
 	var user models.User
 	err := h.db.QueryRow(`
-		SELECT id, username, email, password, created_at, updated_at
+		SELECT id, username, email, password, avatar_url, created_at, updated_at
 		FROM users WHERE email = $1
-	`, req.Email).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	`, req.Email).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		respondWithError(w, http.StatusUnauthorized, "Invalid email or password")
@@ -174,9 +174,9 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		UPDATE users 
 		SET username = $1, updated_at = $2 
 		WHERE id = $3
-		RETURNING id, username, email, password, created_at, updated_at
+		RETURNING id, username, email, password, avatar_url, created_at, updated_at
 	`, req.Username, time.Now(), userID).Scan(
-		&updatedUser.ID, &updatedUser.Username, &updatedUser.Email, &updatedUser.Password, &updatedUser.CreatedAt, &updatedUser.UpdatedAt,
+		&updatedUser.ID, &updatedUser.Username, &updatedUser.Email, &updatedUser.Password, &updatedUser.AvatarURL, &updatedUser.CreatedAt, &updatedUser.UpdatedAt,
 	)
 
 	if err != nil {
@@ -253,7 +253,7 @@ func (h *Handlers) GetUsers(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
 
 	rows, err := h.db.Query(`
-		SELECT id, username, email, created_at, updated_at
+		SELECT id, username, email, avatar_url, created_at, updated_at
 		FROM users
 		WHERE id != $1
 		ORDER BY username ASC
@@ -267,9 +267,13 @@ func (h *Handlers) GetUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		var avatarURL sql.NullString
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &avatarURL, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan user")
 			return
+		}
+		if avatarURL.Valid {
+			user.AvatarURL = avatarURL.String
 		}
 		users = append(users, user)
 	}
@@ -328,6 +332,7 @@ func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
 		COALESCE(lc.last_message_at, '1970-01-01T00:00:00Z') as last_message_at,
 		u.id AS participant_id,
 		u.username AS participant_username,
+		u.avatar_url AS participant_avatar_url,
 		g.id AS group_id,
 		g.name AS group_name,
 		(SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as participant_count,
@@ -355,12 +360,12 @@ func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
 		var chatID uuid.UUID
 		var lastMessageAt time.Time
 		var participantID, groupID, messageID sql.NullString
-		var participantUsername, groupName, encryptedContent, messageType sql.NullString
+		var participantUsername, participantAvatarURL, groupName, encryptedContent, messageType sql.NullString
 		var participantCount sql.NullInt64
 
 		err := rows.Scan(
 			&chatType, &chatID, &lastMessageAt,
-			&participantID, &participantUsername,
+			&participantID, &participantUsername, &participantAvatarURL,
 			&groupID, &groupName, &participantCount,
 			&messageID, &encryptedContent, &messageType,
 		)
@@ -378,8 +383,9 @@ func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
 		if chatType == "dm" && participantID.Valid {
 			chat.Name = participantUsername.String
 			chat.Participant = &models.User{
-				ID:       uuid.MustParse(participantID.String),
-				Username: participantUsername.String,
+				ID:        uuid.MustParse(participantID.String),
+				Username:  participantUsername.String,
+				AvatarURL: participantAvatarURL.String,
 			}
 		} else if chatType == "group" && groupID.Valid {
 			chat.Name = groupName.String
