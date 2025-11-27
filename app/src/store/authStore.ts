@@ -18,6 +18,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -109,6 +110,22 @@ export const useAuthStore = create<AuthState>()(
             error: errorMessage,
           });
           // Re-throw to be caught in the component
+          throw new Error(errorMessage);
+        }
+      },
+
+      deleteAccount: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          await apiService.deleteAccount();
+          // After successful deletion on the server, perform a local logout
+          await get().logout();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Account deletion failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
           throw new Error(errorMessage);
         }
       },

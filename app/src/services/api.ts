@@ -47,11 +47,20 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      // For 204 No Content, response.json() will fail. We handle this case.
+      if (response.status === 204) {
+        return {} as T; // Return an empty object for void responses
+      }
+      const errorData = await response.json().catch(() => ({ message: `HTTP ${response.status}: ${response.statusText}` }));
+      throw new Error(errorData.message);
     }
 
-    return response.json();
+    // Handle 204 No Content response
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      return response.json();
+    }
+    return {} as T;
   }
 
   // Auth endpoints
@@ -74,6 +83,13 @@ class ApiService {
     return this.request<User>('/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAccount(): Promise<void> {
+    // Use the generic request helper to ensure the auth token is sent
+    return this.request<void>('/profile', {
+      method: 'DELETE',
     });
   }
 

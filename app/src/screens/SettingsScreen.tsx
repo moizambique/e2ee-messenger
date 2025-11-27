@@ -17,7 +17,7 @@ import { RootStackParamList } from '../types';
 type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const SettingsScreen: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const navigation = useNavigation<SettingsScreenNavigationProp>();
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -52,11 +52,7 @@ const SettingsScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            showAlert('Coming Soon', 'Account deletion will be implemented soon.', [
-              { text: 'OK', onPress: () => {} },
-            ]);
-          },
+          onPress: deleteAccount,
         },
       ]
     );

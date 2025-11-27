@@ -192,6 +192,25 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedUser)
 }
 
+// DeleteAccount handles the permanent deletion of a user's account
+func (h *Handlers) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+
+	// The ON DELETE CASCADE constraint on the users table should handle
+	// deleting all related data (messages, keys, group memberships, etc.)
+	_, err := h.db.Exec("DELETE FROM users WHERE id = $1", userID)
+	if err != nil {
+		log.Printf("Failed to delete user account %s: %v", userID, err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete account")
+		return
+	}
+
+	log.Printf("User account %s deleted successfully", userID)
+
+	// 204 No Content is appropriate for a successful deletion with no response body
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // GetUsers returns a list of all users, excluding the current user
 func (h *Handlers) GetUsers(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
