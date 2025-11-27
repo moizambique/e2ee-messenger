@@ -29,6 +29,7 @@ const GroupChatScreen: React.FC = () => {
     isLoading, 
     error, 
     setCurrentChat,
+    sendMessage,
     clearError 
   } = useChatStore();
   
@@ -55,7 +56,24 @@ const GroupChatScreen: React.FC = () => {
   }, [error, clearError]);
 
   const handleSendMessage = async () => {
-    RNAlert.alert('Coming Soon', 'Sending messages in group chats will be implemented next!');
+    if (!messageText.trim() || sending) return;
+
+    const text = messageText.trim();
+    setMessageText('');
+    setSending(true);
+
+    try {
+      await sendMessage(chat.id, text, 'text', true);
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error) {
+      setMessageText(text);
+      RNAlert.alert('Error', 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
   };
 
   const renderMessage = ({ item }: { item: Message }) => {

@@ -15,8 +15,8 @@ interface ChatState {
 
   // Actions
   loadChats: () => Promise<void>;
-  loadMessages: (recipientId: string, since?: string) => Promise<void>;
-  sendMessage: (recipientId: string, content: string, type: 'text' | 'file' | 'system') => Promise<void>;
+  loadMessages: (params: { recipientId?: string; groupId?: string; since?: string }) => Promise<void>;
+  sendMessage: (targetId: string, content: string, type: 'text' | 'file' | 'system', isGroup: boolean) => Promise<void>;
   setCurrentChat: (chat: Chat | null) => void;
   addMessage: (message: Message) => void;
   updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => void;
@@ -53,12 +53,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  loadMessages: async (recipientId: string, since?: string) => {
+  loadMessages: async (params: { recipientId?: string; groupId?: string; since?: string }) => {
     set({ isLoading: true, error: null });
     
     try {
       const { user } = useAuthStore.getState();
-      const messages = await apiService.getMessages({ recipient_id: recipientId, limit: 50 });
+      const messages = await apiService.getMessages({ 
+        recipient_id: params.recipientId, 
+        group_id: params.groupId, 
+        limit: 50 });
       const processedMessages = (messages || []).map(msg => {
         // If the message is from the other person, we don't show a status.
         // If it's our message, we can assume 'delivered' if it's coming from the server.
@@ -78,26 +81,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (recipientId: string, content: string, type: 'text' | 'file' | 'system') => {
+  sendMessage: async (targetId: string, content: string, type: 'text' | 'file' | 'system', isGroup: boolean) => {
     const { user } = useAuthStore.getState();
     const tempId = `temp_${Date.now()}`;
     try {
       // In a real app, you would establish a session when starting a chat
       // For now, we do it before sending a message if it doesn't exist.
       // This part is still a mock and needs to be replaced with a real key exchange.
-      const deviceId = 'mock-device-id'; // This would come from the user object or key bundle
-      const sessionId = `${recipientId}_${deviceId}`;
+      // For groups, the session ID can just be the group ID.
+      const deviceId = 'mock-device-id'; 
+      const sessionId = isGroup ? targetId : `${targetId}_${deviceId}`;
       let session = await getSession(sessionId);
       if (!session) {
         // This preKeyBundle would be fetched from the server for the recipient
         const mockPreKeyBundle: any = { identityKey: 'mock', preKey: 'mock' };
-        session = await establishSession(recipientId, deviceId, mockPreKeyBundle);
+        session = await establishSession(targetId, deviceId, mockPreKeyBundle);
       }
 
       const message: EncryptedMessage = {
         messageId: tempId, // The client-generated temporary ID
         senderId: user!.id,
-        recipientId: recipientId,
+        recipientId: targetId, // This was the typo
         content: content,
         type: type,
         timestamp: Date.now(),
@@ -107,18 +111,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const tempMessage: Message = {
         id: tempId,
         sender_id: user!.id,
-        recipient_id: recipientId,
+        recipient_id: isGroup ? undefined : targetId,
+        group_id: isGroup ? targetId : undefined,
         encrypted_content: await encryptMessage(session.id, message),
         message_type: type,
         created_at: new Date().toISOString(),
         status: 'sending',
       };
       get().addMessage(tempMessage);
-
+      
       const encryptedContent = await encryptMessage(session.id, message);
 
       const sentMessage = await apiService.sendMessage({
-        recipient_id: message.recipientId,
+        recipient_id: isGroup ? undefined : targetId,
+        group_id: isGroup ? targetId : undefined,
         encrypted_content: encryptedContent,
         message_type: type,
       });
@@ -139,7 +145,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setCurrentChat: (chat: Chat | null) => {
     set({ currentChat: chat });
     if (chat && chat.type === 'dm' && chat.participant) {
-      get().loadMessages(chat.participant.id);
+      get().loadMessages({ recipientId: chat.participant.id });
+    } else if (chat && chat.type === 'group') {
+      get().loadMessages({ groupId: chat.id });
     } else {
       get().clearMessages();
     }

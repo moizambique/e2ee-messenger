@@ -149,7 +149,7 @@ func main() {
 		{
 			ID:               uuid.New(),
 			SenderID:         users[0].ID,
-			RecipientID:      users[1].ID,
+			RecipientID:      &users[1].ID,
 			EncryptedContent: "encrypted-hello-from-alice",
 			MessageType:      "text",
 			CreatedAt:        time.Now().Add(-2 * time.Hour),
@@ -157,7 +157,7 @@ func main() {
 		{
 			ID:               uuid.New(),
 			SenderID:         users[1].ID,
-			RecipientID:      users[0].ID,
+			RecipientID:      &users[0].ID,
 			EncryptedContent: "encrypted-hello-back-from-bob",
 			MessageType:      "text",
 			CreatedAt:        time.Now().Add(-1 * time.Hour),
@@ -165,7 +165,7 @@ func main() {
 		{
 			ID:               uuid.New(),
 			SenderID:         users[0].ID,
-			RecipientID:      users[1].ID,
+			RecipientID:      &users[1].ID,
 			EncryptedContent: "encrypted-how-are-you",
 			MessageType:      "text",
 			CreatedAt:        time.Now().Add(-30 * time.Minute),

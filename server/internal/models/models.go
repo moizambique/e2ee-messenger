@@ -50,9 +50,10 @@ type OneTimeKey struct {
 
 // Message represents an encrypted message
 type Message struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	SenderID    uuid.UUID `json:"sender_id" db:"sender_id"`
-	RecipientID uuid.UUID `json:"recipient_id" db:"recipient_id"`
+	ID          uuid.UUID  `json:"id" db:"id"`
+	SenderID    uuid.UUID  `json:"sender_id" db:"sender_id"`
+	RecipientID *uuid.UUID `json:"recipient_id,omitempty" db:"recipient_id"`
+	GroupID     *uuid.UUID `json:"group_id,omitempty" db:"group_id"`
 	// Note: We never store plaintext content
 	EncryptedContent string    `json:"encrypted_content" db:"encrypted_content"`
 	MessageType      string    `json:"message_type" db:"message_type"` // "text", "file", "system"
@@ -152,9 +153,10 @@ type BootstrapKeysResponse struct {
 
 // SendMessageRequest represents a message send request
 type SendMessageRequest struct {
-	RecipientID      string `json:"recipient_id" validate:"required"` // This tag was correct, but let's double check the client
-	EncryptedContent string `json:"encrypted_content" validate:"required"`
-	MessageType      string `json:"message_type" validate:"required,oneof=text file system"`
+	RecipientID      *string `json:"recipient_id,omitempty"`
+	GroupID          *string `json:"group_id,omitempty"`
+	EncryptedContent string  `json:"encrypted_content" validate:"required"`
+	MessageType      string  `json:"message_type" validate:"required,oneof=text file system"`
 }
 
 // GetMessagesRequest represents a get messages request

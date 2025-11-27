@@ -90,7 +90,7 @@ const ChatScreen: React.FC = () => {
     setSending(true);
 
     try {
-      await sendMessage(participant.id, text, 'text');
+      await sendMessage(participant.id, text, 'text', false);
       // Scroll to bottom after sending
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });

@@ -37,10 +37,10 @@ func Migrate(db *DB) error {
 		createUsersTable,
 		createDeviceKeysTable,
 		createOneTimeKeysTable,
-		createMessagesTable,
-		createReceiptsTable,
 		createGroupsTable,
 		createGroupMembersTable,
+		createMessagesTable,
+		createReceiptsTable,
 		createAttachmentsTable,
 		createIndexes,
 	}
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS messages (
     encrypted_content TEXT NOT NULL,
     message_type VARCHAR(50) NOT NULL DEFAULT 'text',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT chk_recipient_or_group CHECK (recipient_id IS NOT NULL OR group_id IS NOT NULL)
+    CONSTRAINT chk_recipient_or_group CHECK (num_nonnulls(recipient_id, group_id) = 1)
 );
 `
 

@@ -70,19 +70,21 @@ const ContactsScreen: React.FC = () => {
 
   const handleContactPress = (contact: User) => {
     // Find if a chat with this participant already exists
-    const existingChat = chats.find(chat => chat.participant.id === contact.id);
+    const existingChat = chats.find(chat => chat.type === 'dm' && chat.participant?.id === contact.id);
 
     if (existingChat) {
       navigation.navigate('Chat', { participant: contact });
     } else {
       // If no chat exists, create a temporary one to start the conversation
       const newChat: Chat = {
-        id: `temp_chat_${contact.id}`,
+        id: contact.id,
+        type: 'dm',
+        name: contact.username,
         participant: contact,
         unread_count: 0,
         updated_at: new Date().toISOString(),
       };
-      navigation.navigate('Chat', { participant: newChat.participant });
+      navigation.navigate('Chat', { participant: contact });
     }
   };
 

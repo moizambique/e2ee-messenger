@@ -21,18 +21,18 @@ func setupTestHandlers() *handlers.Handlers {
 	// Create in-memory database for testing
 	db, _ := database.New(":memory:")
 	database.Migrate(db)
-	
+
 	hub := websocket.NewHub()
 	cfg := &config.Config{
 		JWTSecret: "test-secret",
 	}
-	
+
 	return handlers.New(db, hub, cfg)
 }
 
 func TestSignup(t *testing.T) {
 	h := setupTestHandlers()
-	
+
 	tests := []struct {
 		name           string
 		request        models.SignupRequest
@@ -85,24 +85,24 @@ func TestSignup(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
 			req := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			w := httptest.NewRecorder()
 			h.Signup(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
-			
+
 			if !tt.expectError && w.Code == http.StatusOK {
 				var response models.AuthResponse
 				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 					t.Errorf("Failed to unmarshal response: %v", err)
 				}
-				
+
 				if response.Token == "" {
 					t.Error("Expected token in response")
 				}
-				
+
 				if response.User.Username != tt.request.Username {
 					t.Errorf("Expected username %s, got %s", tt.request.Username, response.User.Username)
 				}
@@ -113,20 +113,20 @@ func TestSignup(t *testing.T) {
 
 func TestLogin(t *testing.T) {
 	h := setupTestHandlers()
-	
+
 	// First create a user
 	signupReq := models.SignupRequest{
 		Username: "testuser",
 		Email:    "test@example.com",
 		Password: "password123",
 	}
-	
+
 	body, _ := json.Marshal(signupReq)
 	req := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.Signup(w, req)
-	
+
 	tests := []struct {
 		name           string
 		request        models.LoginRequest
@@ -167,20 +167,20 @@ func TestLogin(t *testing.T) {
 			body, _ := json.Marshal(tt.request)
 			req := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			w := httptest.NewRecorder()
 			h.Login(w, req)
-			
+
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
 			}
-			
+
 			if !tt.expectError && w.Code == http.StatusOK {
 				var response models.AuthResponse
 				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 					t.Errorf("Failed to unmarshal response: %v", err)
 				}
-				
+
 				if response.Token == "" {
 					t.Error("Expected token in response")
 				}
@@ -191,24 +191,24 @@ func TestLogin(t *testing.T) {
 
 func TestUploadDeviceKey(t *testing.T) {
 	h := setupTestHandlers()
-	
+
 	// Create a user and get token
 	userID := uuid.New()
 	token := "test-token" // In real test, generate proper JWT
-	
+
 	req := httptest.NewRequest("POST", "/v1/keys/device", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add user to context (simulate middleware)
 	ctx := context.WithValue(req.Context(), "user_id", userID)
 	req = req.WithContext(ctx)
-	
+
 	deviceKeyReq := models.DeviceKeyRequest{
 		DeviceID:  "test-device",
 		PublicKey: "test-public-key",
 	}
-	
+
 	body, _ := json.Marshal(deviceKeyReq)
 	req.Body = http.NoBody // Reset body
 	req = httptest.NewRequest("POST", "/v1/keys/device", bytes.NewBuffer(body))
@@ -216,19 +216,19 @@ func TestUploadDeviceKey(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	ctx = context.WithValue(req.Context(), "user_id", userID)
 	req = req.WithContext(ctx)
-	
+
 	w := httptest.NewRecorder()
 	h.UploadDeviceKey(w, req)
-	
+
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
-	
+
 	var response models.DeviceKey
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Errorf("Failed to unmarshal response: %v", err)
 	}
-	
+
 	if response.DeviceID != deviceKeyReq.DeviceID {
 		t.Errorf("Expected device ID %s, got %s", deviceKeyReq.DeviceID, response.DeviceID)
 	}
@@ -236,25 +236,26 @@ func TestUploadDeviceKey(t *testing.T) {
 
 func TestSendMessage(t *testing.T) {
 	h := setupTestHandlers()
-	
+
 	// Create two users
 	senderID := uuid.New()
 	recipientID := uuid.New()
-	
+
 	req := httptest.NewRequest("POST", "/v1/messages", nil)
 	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add sender to context
 	ctx := context.WithValue(req.Context(), "user_id", senderID)
 	req = req.WithContext(ctx)
-	
+
+	recipientIDStr := recipientID.String()
 	messageReq := models.SendMessageRequest{
-		RecipientID:     recipientID.String(),
+		RecipientID:      &recipientIDStr,
 		EncryptedContent: "encrypted-message-content",
-		MessageType:     "text",
+		MessageType:      "text",
 	}
-	
+
 	body, _ := json.Marshal(messageReq)
 	req.Body = http.NoBody
 	req = httptest.NewRequest("POST", "/v1/messages", bytes.NewBuffer(body))
@@ -262,24 +263,24 @@ func TestSendMessage(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	ctx = context.WithValue(req.Context(), "user_id", senderID)
 	req = req.WithContext(ctx)
-	
+
 	w := httptest.NewRecorder()
 	h.SendMessage(w, req)
-	
+
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
-	
+
 	var response models.Message
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Errorf("Failed to unmarshal response: %v", err)
 	}
-	
+
 	if response.SenderID != senderID {
 		t.Errorf("Expected sender ID %s, got %s", senderID, response.SenderID)
 	}
-	
-	if response.RecipientID != recipientID {
-		t.Errorf("Expected recipient ID %s, got %s", recipientID, response.RecipientID)
+
+	if response.RecipientID == nil || *response.RecipientID != recipientID {
+		t.Errorf("Expected recipient ID %s, got %s", recipientID, response.RecipientID.String())
 	}
 }

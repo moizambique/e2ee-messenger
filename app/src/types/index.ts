@@ -29,7 +29,8 @@ export interface OneTimeKey {
 export interface Message {
   id: string;
   sender_id: string;
-  recipient_id: string;
+  recipient_id?: string;
+  group_id?: string;
   encrypted_content: string;
   message_type: 'text' | 'file' | 'system';
   created_at: string;
@@ -82,13 +83,15 @@ export interface CreateGroupRequest {
 }
 
 export interface SendMessageRequest {
-  recipient_id: string;
+  recipient_id?: string;
+  group_id?: string;
   encrypted_content: string;
   message_type: 'text' | 'file' | 'system';
 }
 
 export interface GetMessagesRequest {
-  recipient_id: string;
+  recipient_id?: string;
+  group_id?: string;
   since?: string;
   limit?: number;
 }

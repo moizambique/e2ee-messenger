@@ -500,43 +500,91 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Received SendMessage request for recipient: %s", req.RecipientID)
-
-	recipientID, err := uuid.Parse(req.RecipientID)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
+	// A message must have either a recipient or a group
+	if req.RecipientID == nil && req.GroupID == nil {
+		respondWithError(w, http.StatusBadRequest, "Message must have a recipient_id or a group_id")
 		return
 	}
 
 	message := models.Message{
 		ID:               uuid.New(),
 		SenderID:         userID,
-		RecipientID:      recipientID,
 		EncryptedContent: req.EncryptedContent,
 		MessageType:      req.MessageType,
 		CreatedAt:        time.Now(),
 	}
 
-	log.Printf("DB INSERT: sender_id=%s, recipient_id=%s", message.SenderID, message.RecipientID)
+	if req.GroupID != nil {
+		// This is a group message
+		groupID, err := uuid.Parse(*req.GroupID)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid group_id format")
+			return
+		}
+		message.GroupID = &groupID
 
-	_, err = h.db.Exec(`
-		INSERT INTO messages (id, sender_id, recipient_id, encrypted_content, message_type, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, message.ID, message.SenderID, message.RecipientID, message.EncryptedContent, message.MessageType, message.CreatedAt)
+		// Verify the sender is a member of the group
+		var memberCount int
+		err = h.db.QueryRow("SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND user_id = $2", groupID, userID).Scan(&memberCount)
+		if err != nil || memberCount == 0 {
+			respondWithError(w, http.StatusForbidden, "You are not a member of this group")
+			return
+		}
 
-	if err != nil {
-		log.Printf("Database error on message insert: %v", err) // Add detailed logging
-		respondWithError(w, http.StatusInternalServerError, "Failed to send message")
-		return
+		// Insert group message into DB
+		_, err = h.db.Exec(`
+			INSERT INTO messages (id, sender_id, group_id, encrypted_content, message_type, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, message.ID, message.SenderID, message.GroupID, message.EncryptedContent, message.MessageType, message.CreatedAt)
+		if err != nil {
+			log.Printf("Database error on group message insert: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to send group message")
+			return
+		}
+
+		// Get all members of the group to notify them
+		rows, err := h.db.Query("SELECT user_id FROM group_members WHERE group_id = $1 AND user_id != $2", groupID, userID)
+		if err != nil {
+			log.Printf("Failed to get group members for notification: %v", err)
+		} else {
+			defer rows.Close()
+			notification := websocket.Message{Type: "new_message", Payload: message}
+			for rows.Next() {
+				var memberID string
+				if err := rows.Scan(&memberID); err == nil {
+					h.hub.SendToUser(memberID, notification)
+				}
+			}
+		}
+
+	} else {
+		// This is a direct message
+		recipientID, err := uuid.Parse(*req.RecipientID)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
+			return
+		}
+		message.RecipientID = &recipientID
+
+		// Insert direct message into DB
+		_, err = h.db.Exec(`
+			INSERT INTO messages (id, sender_id, recipient_id, encrypted_content, message_type, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, message.ID, message.SenderID, message.RecipientID, message.EncryptedContent, message.MessageType, message.CreatedAt)
+
+		if err != nil {
+			log.Printf("Database error on message insert: %v", err)
+			respondWithError(w, http.StatusInternalServerError, "Failed to send message")
+			return
+		}
+
+		// Send real-time notification to recipient
+		notification := websocket.Message{
+			Type:    "new_message",
+			Payload: message,
+		}
+		h.hub.SendToUser(recipientID.String(), notification)
 	}
-
-	// Send real-time notification to recipient
-	notification := websocket.Message{
-		Type:    "new_message",
-		Payload: message, // Send the full message object
-	}
-
-	h.hub.SendToUser(recipientID.String(), notification)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(message)
@@ -546,20 +594,12 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
 
+	// Get query parameters
 	recipientIDStr := r.URL.Query().Get("recipient_id")
-	if recipientIDStr == "" {
-		respondWithError(w, http.StatusBadRequest, "recipient_id parameter required")
-		return
-	}
-
-	recipientID, err := uuid.Parse(recipientIDStr)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
-		return
-	}
-
-	since := r.URL.Query().Get("since")
+	groupIDStr := r.URL.Query().Get("group_id")
 	limitStr := r.URL.Query().Get("limit")
+
+	// Set default limit
 	limit := 50 // default limit
 
 	if limitStr != "" {
@@ -571,28 +611,48 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	var query string
 	var args []interface{}
 
-	if since != "" {
+	if groupIDStr != "" {
+		// Fetching messages for a group
+		groupID, err := uuid.Parse(groupIDStr)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid group_id format")
+			return
+		}
+		// TODO: Verify user is a member of the group before fetching messages
 		query = `
-			SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at
-			FROM messages 
-			WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1))
-			AND created_at > $3			
-			ORDER BY created_at DESC
-			LIMIT $4
+			SELECT id, sender_id, group_id, encrypted_content, message_type, created_at FROM (
+				SELECT id, sender_id, group_id, encrypted_content, message_type, created_at
+				FROM messages 
+				WHERE group_id = $1
+				ORDER BY created_at DESC
+				LIMIT $2
+			) sub
+			ORDER BY created_at ASC;
 		`
-		args = []interface{}{userID, recipientID, since, limit}
-	} else {
+		args = []interface{}{groupID, limit}
+
+	} else if recipientIDStr != "" {
+		// Fetching messages for a DM
+		recipientID, err := uuid.Parse(recipientIDStr)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
+			return
+		}
 		query = `
 			SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at FROM (
 				SELECT id, sender_id, recipient_id, encrypted_content, message_type, created_at
-			FROM messages 
-			WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1))
+				FROM messages 
+				WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1))
 				ORDER BY created_at DESC
-			LIMIT $3
+				LIMIT $3
 			) sub
 			ORDER BY created_at ASC;
 		`
 		args = []interface{}{userID, recipientID, limit}
+
+	} else {
+		respondWithError(w, http.StatusBadRequest, "Either recipient_id or group_id parameter is required")
+		return
 	}
 
 	rows, err := h.db.Query(query, args...)
@@ -605,7 +665,12 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	var messages []models.Message
 	for rows.Next() {
 		var message models.Message
-		err := rows.Scan(&message.ID, &message.SenderID, &message.RecipientID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
+		if groupIDStr != "" {
+			err = rows.Scan(&message.ID, &message.SenderID, &message.GroupID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
+		} else {
+			err = rows.Scan(&message.ID, &message.SenderID, &message.RecipientID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
+		}
+
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Failed to scan message")
 			return

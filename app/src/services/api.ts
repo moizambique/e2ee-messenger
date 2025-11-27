@@ -123,7 +123,8 @@ class ApiService {
 
   async getMessages(params: GetMessagesRequest): Promise<Message[]> {
     const searchParams = new URLSearchParams({
-      recipient_id: params.recipient_id,
+      ...(params.recipient_id && { recipient_id: params.recipient_id }),
+      ...(params.group_id && { group_id: params.group_id }),
       ...(params.since && { since: params.since }),
       ...(params.limit && { limit: params.limit.toString() }),
     });
