@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert as RNAlert,
+  Image,
 } from 'react-native';
 import { Linking } from 'react-native';
 import * as FileSystem from 'expo-file-system';
@@ -22,6 +23,7 @@ import { useChatStore } from '../store/chatStore';
 import { apiService } from '../services/api';
 import { useAuth } from '../store/AuthContext';
 import Avatar from '../types/Avatar';
+import { useImageAspectRatio } from './useImageAspectRatio';
 import { RootStackParamList, Message } from '../types';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -190,27 +192,77 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  // A new component for rendering the image to contain the hook logic
+  const ImageAttachment: React.FC<{ item: Message; isOwn: boolean }> = ({ item, isOwn }) => {
+    const fileInfo = JSON.parse(item.encrypted_content);
+    const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
+    const token = apiService.getToken();
+    const imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
+    const headers = Platform.OS === 'web' ? undefined : { Authorization: `Bearer ${token}` };
+
+    const aspectRatio = useImageAspectRatio(imageUrl, headers);
+
+    // Create a single, merged style object.
+    // This is more stable than passing an array of styles.
+    const imageStyle = {
+      ...styles.imageAttachment,
+      aspectRatio: aspectRatio || 1, // Use the loaded aspect ratio, or fallback to 1:1
+    };
+    const imageSource = { uri: imageUrl, headers };
+
+    // We apply the bubble styles directly to the Image component
+    // and wrap it in a View that will contain the timestamp.
+    return (
+      <Image source={imageSource} style={[styles.messageBubble, isOwn && styles.ownMessageBubble, imageStyle]} resizeMode="contain" />
+    );
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwn = item.sender_id === user?.id;
     
-    return (
-      <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
-        {item.message_type === 'file' ? (
+    if (item.message_type === 'file') {
+      let fileInfo: { fileName: string; fileType: string } | null = null;
+      try {
+        fileInfo = JSON.parse(item.encrypted_content);
+      } catch (e) {
+        // Not a valid file message, render as text
+      }
+
+      const isImage = fileInfo?.fileType?.startsWith('image/');
+
+      if (isImage && fileInfo) {
+        return (
+          <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+            <TouchableOpacity
+              onPress={() => handleDownloadAttachment(item)}
+              style={isOwn ? styles.touchableBubbleWrapper : {}}
+            >
+              <ImageAttachment item={item} isOwn={isOwn} />
+              <View style={styles.messageInfoOnImage}>
+                <Text style={[styles.messageTime, styles.ownMessageTime]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {isOwn && renderStatusIndicator(item.status)}
+              </View>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // Fallback for non-image files
+      return (
+        <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
           <TouchableOpacity
             onPress={() => handleDownloadAttachment(item)}
-            style={isOwn ? styles.touchableOwn : styles.touchableOther}
+            style={isOwn ? styles.touchableBubbleWrapper : {}}
           >
             <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble, styles.fileBubble]}>
               <Ionicons name="document-outline" size={24} color={isOwn ? '#fff' : '#007AFF'} style={styles.fileIcon} />
               <View style={styles.fileInfo}>
                 <Text style={[styles.fileName, isOwn && styles.ownMessageText]} numberOfLines={1}>
-                  {(() => {
-                    try { return JSON.parse(item.encrypted_content).fileName; }
-                    catch (e) { return 'File Attachment'; }
-                  })()}
+                  {fileInfo?.fileName || 'File Attachment'}
                 </Text>
                 <Text style={[styles.fileSize, isOwn && styles.ownMessageTime]}>
-                  {/* File size would go here if available */}
                   Tap to download
                 </Text>
               </View>
@@ -222,26 +274,30 @@ const ChatScreen: React.FC = () => {
               </View>
             </View>
           </TouchableOpacity>
-        ) : (
-          <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
-            <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
-              {(() => {
-                try {
-                  return JSON.parse(Buffer.from(item.encrypted_content, 'base64').toString('utf-8')).content;
-                } catch (e) {
-                  // If it's not JSON, it might be a file metadata string
-                  return item.encrypted_content;
-                }
-              })()}
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+        <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
+          <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
+            {(() => {
+              try {
+                return JSON.parse(Buffer.from(item.encrypted_content, 'base64').toString('utf-8')).content;
+              } catch (e) {
+                // If it's not JSON, it might be a file metadata string
+                return item.encrypted_content;
+              }
+            })()}
+          </Text>
+          <View style={styles.textMessageInfo}>
+            <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
-            <View style={styles.textMessageInfo}>
-              <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
-                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              {isOwn && renderStatusIndicator(item.status)}
-            </View>
+            {isOwn && renderStatusIndicator(item.status)}
           </View>
-        )}
+        </View>
       </View>
     );
   };
@@ -464,6 +520,12 @@ const styles = StyleSheet.create({
     paddingBottom: 24, // Add padding to make space for the timestamp
     position: 'relative',
   },
+  imageAttachment: {
+    // Set an explicit width to prevent the component from collapsing to 0x0
+    width: 250,
+    borderRadius: 18,
+    backgroundColor: '#E1E1E1', // Placeholder color while loading
+  },
   fileIcon: {
     marginRight: 12,
   },
@@ -486,6 +548,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // Special style for timestamp on images to give it a background
+  messageInfoOnImage: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
   textMessageInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -493,11 +565,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 4,
   },
-  touchableOwn: {
+  // This style is the key to fixing the alignment and touchable area.
+  // It forces the TouchableOpacity to shrink-wrap its content to the right.
+  touchableBubbleWrapper: {
     alignItems: 'flex-end',
-  },
-  touchableOther: {
-    alignItems: 'flex-start',
   },
 });
 
