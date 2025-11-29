@@ -369,6 +369,7 @@ const styles = StyleSheet.create({
   messageContainer: {
     marginHorizontal: 20,
     marginVertical: 4,
+    alignItems: 'flex-start', // Add this to align received messages to the left
   },
   ownMessageContainer: {
     alignItems: 'flex-end',
