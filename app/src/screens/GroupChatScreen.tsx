@@ -147,8 +147,14 @@ const GroupChatScreen: React.FC = () => {
     return <Image source={imageSource} style={[styles.messageBubble, isOwn && styles.ownMessageBubble, imageStyle]} resizeMode="contain" />;
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item, index }: { item: Message, index: number }) => {
     const isOwn = item.sender_id === user?.id;
+
+    // Determine if the sender's name should be shown
+    const showSenderName = !isOwn && (
+      index === 0 || // Always show for the first message in the list
+      (messages[index - 1] && messages[index - 1].sender_id !== item.sender_id) // Show if sender is different from previous
+    );
 
     if (item.message_type === 'file') {
       let fileInfo: { fileName: string; fileType: string } | null = null;
@@ -161,6 +167,9 @@ const GroupChatScreen: React.FC = () => {
       if (isImage && fileInfo) {
         return (
           <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+            {showSenderName && (
+              <Text style={styles.senderName}>{item.sender?.username || 'Unknown User'}</Text>
+            )}
             <TouchableOpacity
               onPress={() => handleDownloadAttachment(item)}
               style={isOwn ? styles.touchableBubbleWrapper : {}}
@@ -179,6 +188,9 @@ const GroupChatScreen: React.FC = () => {
       // Fallback for non-image files
       return (
         <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+          {showSenderName && (
+            <Text style={styles.senderName}>{item.sender?.username || 'Unknown User'}</Text>
+          )}
           <TouchableOpacity
             onPress={() => handleDownloadAttachment(item)}
             style={isOwn ? styles.touchableBubbleWrapper : {}}
@@ -206,6 +218,9 @@ const GroupChatScreen: React.FC = () => {
     
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+        {showSenderName && (
+          <Text style={styles.senderName}>{item.sender?.username || 'Unknown User'}</Text>
+        )}
         <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
           <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
             {(() => {
@@ -325,6 +340,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  senderName: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginBottom: 4,
+    marginLeft: 16,
   },
   headerName: {
     fontSize: 18,

@@ -744,14 +744,15 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		// TODO: Verify user is a member of the group before fetching messages
 		query = `
-			SELECT id, sender_id, group_id, encrypted_content, message_type, created_at FROM (
+			SELECT sub.id, sub.sender_id, sub.group_id, sub.encrypted_content, sub.message_type, sub.created_at, u.id, u.username, u.avatar_url FROM (
 				SELECT id, sender_id, group_id, encrypted_content, message_type, created_at
-				FROM messages 
+				FROM messages
 				WHERE group_id = $1
 				ORDER BY created_at DESC
 				LIMIT $2
 			) sub
-			ORDER BY created_at ASC;
+			JOIN users u ON sub.sender_id = u.id
+			ORDER BY sub.created_at ASC;
 		`
 		args = []interface{}{groupID, limit}
 
@@ -790,7 +791,13 @@ func (h *Handlers) GetMessages(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var message models.Message
 		if groupIDStr != "" {
-			err = rows.Scan(&message.ID, &message.SenderID, &message.GroupID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
+			var sender models.User
+			var avatarURL sql.NullString
+			err = rows.Scan(&message.ID, &message.SenderID, &message.GroupID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt, &sender.ID, &sender.Username, &avatarURL)
+			if avatarURL.Valid {
+				sender.AvatarURL = avatarURL.String
+			}
+			message.Sender = &sender
 		} else {
 			err = rows.Scan(&message.ID, &message.SenderID, &message.RecipientID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt)
 		}
