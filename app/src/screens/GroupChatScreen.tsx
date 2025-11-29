@@ -9,14 +9,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert as RNAlert,
+  Image,
 } from 'react-native';
+import { Linking } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { Buffer } from 'buffer';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useChatStore } from '../store/chatStore';
+import { apiService } from '../services/api';
 import { useAuth } from '../store/AuthContext';
-import { RootStackParamList, Message, Chat } from '../types';
+import { useImageAspectRatio } from './useImageAspectRatio';
+import Avatar from '../types/Avatar';
+import { RootStackParamList, Message } from '../types';
 
 type GroupChatScreenRouteProp = RouteProp<RootStackParamList, 'GroupChat'>;
 
@@ -29,7 +37,8 @@ const GroupChatScreen: React.FC = () => {
     isLoading, 
     error, 
     setCurrentChat,
-    sendMessage,
+    sendMessage, 
+    sendFileMessage,
     clearError 
   } = useChatStore();
   
@@ -76,13 +85,128 @@ const GroupChatScreen: React.FC = () => {
     }
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({});
+      if (result.canceled === false) {
+        const { uri, name, mimeType } = result.assets[0];
+        if (mimeType) {
+          // For group chats, isGroup is true
+          await sendFileMessage(chat.id, uri, name, mimeType, true);
+        } else {
+          RNAlert.alert('Error', 'Could not determine file type.');
+        }
+      }
+    } catch (error) {
+      RNAlert.alert('Error', 'Failed to pick document.');
+      console.error(error);
+    }
+  };
+
+  const handleDownloadAttachment = async (message: Message) => {
+    try {
+      const fileInfo = JSON.parse(message.encrypted_content);
+      const { fileName } = fileInfo;
+      if (!fileName) {
+        RNAlert.alert('Error', 'File information is missing.');
+        return;
+      }
+
+      const baseUrl = apiService.getAttachmentDownloadUrl(message.id, fileName);
+      const token = apiService.getToken();
+
+      if (Platform.OS === 'web') {
+        const downloadUrlWithToken = `${baseUrl}?token=${token}`;
+        Linking.openURL(downloadUrlWithToken);
+      } else {
+        const localUri = FileSystem.documentDirectory + fileName;
+        RNAlert.alert('Downloading', `Downloading ${fileName}...`);
+        const { uri } = await FileSystem.downloadAsync(baseUrl, localUri, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log('Finished downloading to ', uri);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri);
+        }
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      RNAlert.alert('Download Failed', 'Could not download the attachment.');
+    }
+  };
+
+  const ImageAttachment: React.FC<{ item: Message; isOwn: boolean }> = ({ item, isOwn }) => {
+    const fileInfo = JSON.parse(item.encrypted_content);
+    const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
+    const token = apiService.getToken();
+    const imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
+    const headers = Platform.OS === 'web' ? undefined : { Authorization: `Bearer ${token}` };
+    const aspectRatio = useImageAspectRatio(imageUrl, headers);
+    const imageStyle = { ...styles.imageAttachment, aspectRatio: aspectRatio || 1 };
+    const imageSource = { uri: imageUrl, headers };
+    return <Image source={imageSource} style={[styles.messageBubble, isOwn && styles.ownMessageBubble, imageStyle]} resizeMode="contain" />;
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwn = item.sender_id === user?.id;
+
+    if (item.message_type === 'file') {
+      let fileInfo: { fileName: string; fileType: string } | null = null;
+      try {
+        fileInfo = JSON.parse(item.encrypted_content);
+      } catch (e) { /* Not a valid file message */ }
+
+      const isImage = fileInfo?.fileType?.startsWith('image/');
+
+      if (isImage && fileInfo) {
+        return (
+          <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+            <TouchableOpacity
+              onPress={() => handleDownloadAttachment(item)}
+              style={isOwn ? styles.touchableBubbleWrapper : {}}
+            >
+              <ImageAttachment item={item} isOwn={isOwn} />
+              <View style={styles.messageInfoOnImage}>
+                <Text style={[styles.messageTime, styles.ownMessageTime]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // Fallback for non-image files
+      return (
+        <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
+          <TouchableOpacity
+            onPress={() => handleDownloadAttachment(item)}
+            style={isOwn ? styles.touchableBubbleWrapper : {}}
+          >
+            <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble, styles.fileBubble]}>
+              <Ionicons name="document-outline" size={24} color={isOwn ? '#fff' : '#007AFF'} style={styles.fileIcon} />
+              <View style={styles.fileInfo}>
+                <Text style={[styles.fileName, isOwn && styles.ownMessageText]} numberOfLines={1}>
+                  {fileInfo?.fileName || 'File Attachment'}
+                </Text>
+                <Text style={[styles.fileSize, isOwn && styles.ownMessageTime]}>
+                  Tap to download
+                </Text>
+              </View>
+              <View style={styles.messageInfo}>
+                <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     
     return (
       <View style={[styles.messageContainer, isOwn && styles.ownMessageContainer]}>
         <View style={[styles.messageBubble, isOwn && styles.ownMessageBubble]}>
-          {/* TODO: For group chats, we should show the sender's name if it's not our own message */}
           <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
             {(() => {
               try {
@@ -90,15 +214,15 @@ const GroupChatScreen: React.FC = () => {
                 const parsed = JSON.parse(decoded);
                 return parsed.content || item.encrypted_content;
               } catch (e) {
+                // If it's not JSON, it might be a file metadata string from an older version
                 return item.encrypted_content;
               }
             })()}
           </Text>          
-          <View style={styles.messageInfo}>
+          <View style={styles.textMessageInfo}>
             <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
-            {/* Status indicators are complex for groups, will implement later */}
           </View>
         </View>
       </View>
@@ -122,9 +246,7 @@ const GroupChatScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <View style={styles.headerInfo}>
-          <View style={styles.avatar}>
-            <Ionicons name="people" size={20} color="#fff" />
-          </View>
+          <Avatar name={chat.name} size={40} isGroup={true} />
           <View>
             <Text style={styles.headerName}>{chat.name}</Text>
             <Text style={styles.headerStatus}>{chat.participant_count} members</Text>
@@ -146,6 +268,9 @@ const GroupChatScreen: React.FC = () => {
 
       <View style={styles.inputContainer}>
         <View style={styles.inputWrapper}>
+          <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument}>
+            <Ionicons name="attach" size={24} color="#007AFF" />
+          </TouchableOpacity>
           <TextInput
             style={styles.textInput}
             value={messageText}
@@ -248,11 +373,12 @@ const styles = StyleSheet.create({
   ownMessageText: {
     color: '#fff',
   },
-  messageInfo: {
+  textMessageInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-end',
     marginTop: 4,
+    paddingTop: 4,
   },
   messageTime: {
     fontSize: 12,
@@ -275,6 +401,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  attachButton: {
+    padding: 8,
+    marginRight: 4,
   },
   textInput: {
     flex: 1,
@@ -308,6 +438,50 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  fileBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 24,
+    position: 'relative',
+  },
+  imageAttachment: {
+    width: 250,
+    borderRadius: 18,
+    backgroundColor: '#E1E1E1',
+  },
+  fileIcon: {
+    marginRight: 12,
+  },
+  fileInfo: {
+    flexShrink: 1,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  messageInfo: {
+    position: 'absolute',
+    bottom: 8,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  messageInfoOnImage: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  touchableBubbleWrapper: {
+    alignItems: 'flex-end',
   },
 });
 

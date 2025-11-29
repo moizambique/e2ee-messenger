@@ -58,6 +58,7 @@ type Message struct {
 	// Note: We never store plaintext content
 	EncryptedContent string    `json:"encrypted_content" db:"encrypted_content"`
 	MessageType      string    `json:"message_type" db:"message_type"` // "text", "file", "system"
+	Sender           *User     `json:"sender,omitempty"`               // Included in API responses, not a DB column
 	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 }
 
