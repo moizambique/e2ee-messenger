@@ -46,5 +46,12 @@
     "expo-document-picker": "~11.10.1",
     "expo-file-system": "~16.0.9",
     "expo-sharing": "~11.10.0"
+  },
+  "overrides": {
+    "expo-modules-autolinking": "~1.11.0",
+    "@expo/config-plugins": "~8.0.0",
+    "@expo/prebuild-config": "~7.0.0",
+    "@expo/metro-config": "~0.18.11",
+    "expo-modules-core": "~1.11.0"
   }
 }
