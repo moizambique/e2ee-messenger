@@ -67,7 +67,7 @@ infra-up:
 	cd infra && docker-compose up -d
 	@echo "Infrastructure started!"
 	@echo "Postgres: localhost:5432"
-	@echo "Adminer: http://localhost:8081"
+	@echo "Adminer: http://localhost:8088"
 
 infra-down:
 	@echo "Stopping infrastructure..."

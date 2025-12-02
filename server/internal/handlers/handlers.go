@@ -114,18 +114,27 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Find user
 	var user models.User
+	var avatarURL sql.NullString
 	err := h.db.QueryRow(`
 		SELECT id, username, email, password, avatar_url, created_at, updated_at
 		FROM users WHERE email = $1
-	`, req.Email).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt)
+	`, req.Email).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &avatarURL, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		respondWithError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Database error")
+		log.Printf("Login database error: %v", err)
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Database error: %v", err))
 		return
+	}
+
+	// Handle nullable avatar_url - only set if not NULL
+	if avatarURL.Valid {
+		user.AvatarURL = avatarURL.String
+	} else {
+		user.AvatarURL = "" // Explicitly set to empty string to match Signup behavior
 	}
 
 	// Verify password
@@ -137,6 +146,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	// Generate JWT token
 	token, err := h.generateToken(user.ID)
 	if err != nil {
+		log.Printf("Login token generation error: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
@@ -148,7 +158,11 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Login JSON encoding error: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to encode response")
+		return
+	}
 }
 
 // UpdateProfile handles updating the current user's profile

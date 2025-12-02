@@ -148,7 +148,7 @@ e2ee-messenger/
 Edit `server/.env`:
 
 ```env
-PORT=8080
+PORT=8088
 ENVIRONMENT=development
 DATABASE_URL=postgres://postgres:password@localhost:5432/e2ee_messenger?sslmode=disable
 JWT_SECRET=your-secret-key-change-in-production
