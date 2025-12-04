@@ -159,21 +159,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // In a real app, you'd include the file size here.
       });
 
-      // 1. Send the initial message of type 'file'
+      // 1. Optimistically add to UI using the LOCAL file URI
+      const tempMessage: Message = {
+        id: tempId,
+        sender_id: user!.id,
+        group_id: isGroup ? targetId : undefined,
+        recipient_id: isGroup ? undefined : targetId,
+        // The content is the metadata, but we add the local URI for rendering
+        encrypted_content: JSON.stringify({ ...JSON.parse(fileMessageContent), localUri: fileUri }),
+        message_type: 'file',
+        created_at: new Date().toISOString(),
+        status: 'sending',
+      };
+      get().addMessage(tempMessage);
+
+      // 2. Send the initial message of type 'file' to the server
       const sentMessage = await apiService.sendMessage({
         recipient_id: isGroup ? undefined : targetId,
         group_id: isGroup ? targetId : undefined,
         encrypted_content: fileMessageContent, // This is just metadata
         message_type: 'file',
       });
-
-      // 2. Optimistically add to UI
-      const tempMessage: Message = {
-        ...sentMessage,
-        id: tempId, // Use a temp ID for UI updates
-        status: 'sending',
-      };
-      get().addMessage(tempMessage);
 
       // 3. Upload the actual file attachment, linking it to the real message ID
       await apiService.uploadAttachment(

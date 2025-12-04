@@ -1049,11 +1049,11 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 // DownloadAttachment serves a file for download
 func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
-	messageIDStr := chi.URLParam(r, "messageID")
-	fileName := chi.URLParam(r, "fileName")
+	messageIDStr := chi.URLParam(r, "messageID") // We still get the messageID from the URL
+	// We will ignore the fileName from the URL param as it can be problematic.
 
-	if messageIDStr == "" || fileName == "" {
-		respondWithError(w, http.StatusBadRequest, "messageID and fileName are required")
+	if messageIDStr == "" {
+		respondWithError(w, http.StatusBadRequest, "messageID is required")
 		return
 	}
 
@@ -1064,15 +1064,15 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Fetch attachment details and message participants from DB
-	var storagePath, mimeType string
+	var storagePath, mimeType, fileName string
 	var senderID, recipientID, groupID sql.NullString // Use sql.NullString for nullable UUIDs
 
 	err = h.db.QueryRow(`
-		SELECT a.storage_path, a.mime_type, m.sender_id, m.recipient_id, m.group_id
+		SELECT a.storage_path, a.mime_type, a.file_name, m.sender_id, m.recipient_id, m.group_id
 		FROM attachments a
 		JOIN messages m ON a.message_id = m.id
-		WHERE a.message_id = $1 AND a.file_name = $2
-	`, messageID, fileName).Scan(&storagePath, &mimeType, &senderID, &recipientID, &groupID)
+		WHERE a.message_id = $1
+	`, messageID).Scan(&storagePath, &mimeType, &fileName, &senderID, &recipientID, &groupID)
 
 	if err == sql.ErrNoRows {
 		respondWithError(w, http.StatusNotFound, "Attachment not found")
@@ -1103,18 +1103,31 @@ func (h *Handlers) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Serve the file
-	// Set headers to prompt download
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
-	w.Header().Set("Content-Type", mimeType)
+	// --- START DEBUGGING ---
+	log.Printf("[DEBUG] DownloadAttachment: User %s requested file '%s' for message '%s'", userID, fileName, messageID)
+	log.Printf("[DEBUG] DownloadAttachment: Path from DB (storagePath): '%s'", storagePath)
+	log.Printf("[DEBUG] DownloadAttachment: MimeType from DB: '%s'", mimeType)
 
-	// Check if file exists before serving
+	// Check if the file exists at the given path from the server's perspective. This is the most important check.
 	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
-		respondWithError(w, http.StatusNotFound, "File not found on server")
+		cwd, _ := os.Getwd()
+		absPath, _ := filepath.Abs(storagePath)
+		log.Printf("[ERROR] DownloadAttachment: File does NOT exist at path '%s'. os.Stat error: %v", storagePath, err)
+		log.Printf("[ERROR] DownloadAttachment: Server's current working directory is '%s'", cwd)
+		log.Printf("[ERROR] DownloadAttachment: The absolute path being checked is '%s'", absPath)
+		respondWithError(w, http.StatusNotFound, "File not found on server (os.Stat check failed)")
 		return
 	}
+	log.Printf("[DEBUG] DownloadAttachment: os.Stat check PASSED. File exists at '%s'. Proceeding to serve.", storagePath)
+	// --- END DEBUGGING ---
 
-	http.ServeFile(w, r, storagePath)
+	// 3. Serve the file. Set headers to display inline for images.
+	w.Header().Set("Content-Disposition", "inline; filename=\""+fileName+"\"")
+	w.Header().Set("Content-Type", mimeType)
+
+	// Clean the path to remove any leading "./" which can cause http.ServeFile to fail.
+	cleanedPath := filepath.Clean(storagePath)
+	http.ServeFile(w, r, cleanedPath)
 }
 
 // WebSocketHandler handles WebSocket connections

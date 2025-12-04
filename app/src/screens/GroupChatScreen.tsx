@@ -136,11 +136,19 @@ const GroupChatScreen: React.FC = () => {
   };
 
   const ImageAttachment: React.FC<{ item: Message; isOwn: boolean }> = ({ item, isOwn }) => {
-    const fileInfo = JSON.parse(item.encrypted_content);
-    const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
+    const fileInfo = JSON.parse(item.encrypted_content);    
     const token = apiService.getToken();
-    const imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
+    let imageUrl: string;
+
+    // If localUri exists (during optimistic update), use it. Otherwise, build the network URL.
+    if (fileInfo.localUri) {
+      imageUrl = fileInfo.localUri;
+    } else {
+      const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
+      imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
+    }
     const headers = Platform.OS === 'web' ? undefined : { Authorization: `Bearer ${token}` };
+    console.log('[DEBUG] GroupChat ImageAttachment: Requesting image with URL:', imageUrl);
     const aspectRatio = useImageAspectRatio(imageUrl, headers);
     const imageStyle = { ...styles.imageAttachment, aspectRatio: aspectRatio || 1 };
     const imageSource = { uri: imageUrl, headers };
