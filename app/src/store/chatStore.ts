@@ -20,7 +20,7 @@ interface ChatState {
   sendFileMessage: (targetId: string, fileUri: string, fileName: string, fileType: string, isGroup: boolean) => Promise<void>;
   setCurrentChat: (chat: Chat | null) => void;
   addMessage: (message: Message) => void;
-  updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => void;
+  updateMessageStatus: (messageIds: string | string[], status: 'sent' | 'delivered' | 'read') => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   markMessagesAsRead: (messageIds: string[]) => Promise<void>;
   markMessageAsRead: (messageId: string) => Promise<void>;
@@ -190,8 +190,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         mockEncryptedFileKey
       );
 
-      // 4. Update the message status to 'sent'
-      get().updateMessage(tempId, { ...sentMessage, status: 'sent' });
+      // 4. Update the message with the real ID from the server, but preserve
+      // the localUri in encrypted_content for the optimistic UI to continue working
+      // until the next full refresh. This avoids a race condition where the UI
+      // tries to fetch the network image before it's available.
+      get().updateMessage(tempId, {
+        id: sentMessage.id,
+        created_at: sentMessage.created_at,
+        status: 'sent',
+      });
 
     } catch (error) {
       get().updateMessage(tempId, { status: 'failed' });
@@ -219,10 +226,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  updateMessageStatus: (messageId: string, status: 'sent' | 'delivered' | 'read') => {
+  updateMessageStatus: (messageIds: string | string[], status: 'sent' | 'delivered' | 'read') => {
+    const idSet = new Set(Array.isArray(messageIds) ? messageIds : [messageIds]);
     set((state) => ({
       messages: state.messages.map((msg) =>
-        msg.id === messageId ? { ...msg, status } : msg
+        idSet.has(msg.id) ? { ...msg, status } : msg,
       ),
     }));
   },
@@ -238,15 +246,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
   markMessagesAsRead: async (messageIds: string[]) => {
     if (messageIds.length === 0) return;
 
-    // In a real app, you might batch these requests.
-    // For now, we'll send them individually.
+    // Optimistically update the UI to prevent the infinite loop.
+    // We mark messages as 'read' locally before sending receipts.
+    get().updateMessageStatus(messageIds, 'read');
+
     try {
+      // Then, send the receipts to the server.
       await Promise.all(messageIds.map(id => apiService.sendReceipt({
         message_id: id,
         type: 'read',
       })));
     } catch (error) {
       console.error('Failed to send read receipts:', error);
+      // Optional: Revert the status on failure. For this implementation,
+      // we'll leave them as 'read' to prevent re-triggering the effect loop.
     }
   },
 

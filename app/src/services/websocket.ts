@@ -1,4 +1,4 @@
-import { WebSocketMessage } from '../types';
+import { WebSocketMessage } from '../types/api';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 

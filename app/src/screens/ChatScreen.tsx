@@ -74,14 +74,15 @@ const ChatScreen: React.FC = () => {
     const unreadMessageIds = messages
       .filter(msg => 
         msg.sender_id === participant.id && msg.recipient_id === user?.id &&
-        (!msg.status || msg.status !== 'read') // A more robust check might be needed
+        (!msg.status || msg.status !== 'read')
       )
       .map(msg => msg.id);
 
     if (unreadMessageIds.length > 0) {
       markMessagesAsRead(unreadMessageIds);
     }
-  }, [messages, participant.id, markMessagesAsRead]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, participant.id, user?.id]);
 
   useEffect(() => {
     if (error) {

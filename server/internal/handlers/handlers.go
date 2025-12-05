@@ -41,6 +41,49 @@ func New(db *database.DB, hub *websocket.Hub, cfg *config.Config) *Handlers {
 	}
 }
 
+// notifyNewMessage sends a "new_message" WebSocket event to the relevant recipients.
+func (h *Handlers) notifyNewMessage(message models.Message) {
+	// For group messages, we need to fetch sender info to include in the payload
+	if message.GroupID != nil {
+		var sender models.User
+		var avatarURL sql.NullString
+		// Use message.SenderID to fetch the sender's details
+		err := h.db.QueryRow("SELECT id, username, avatar_url FROM users WHERE id = $1", message.SenderID).Scan(&sender.ID, &sender.Username, &avatarURL)
+		if err != nil {
+			log.Printf("Could not fetch sender info for group notification: %v", err)
+			// Proceed without sender info if it fails
+		} else {
+			if avatarURL.Valid {
+				sender.AvatarURL = avatarURL.String
+			}
+			message.Sender = &sender
+		}
+
+		// Get all members of the group to notify them (except the sender)
+		rows, err := h.db.Query("SELECT user_id FROM group_members WHERE group_id = $1 AND user_id != $2", message.GroupID, message.SenderID)
+		if err != nil {
+			log.Printf("Failed to get group members for notification: %v", err)
+			return
+		}
+		defer rows.Close()
+
+		notification := websocket.Message{Type: "new_message", Payload: message}
+		for rows.Next() {
+			var memberID string
+			if err := rows.Scan(&memberID); err == nil {
+				h.hub.SendToUser(memberID, notification)
+			}
+		}
+	} else if message.RecipientID != nil {
+		// For direct messages, the payload is simpler
+		notification := websocket.Message{
+			Type:    "new_message",
+			Payload: message,
+		}
+		h.hub.SendToUser((*message.RecipientID).String(), notification)
+	}
+}
+
 // respondWithError is a helper to send a JSON error response.
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
@@ -189,13 +232,14 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Update user in the database
 	var updatedUser models.User
+	var avatarURL sql.NullString
 	err = h.db.QueryRow(`
 		UPDATE users 
 		SET username = $1, updated_at = $2 
 		WHERE id = $3
 		RETURNING id, username, email, password, avatar_url, created_at, updated_at
 	`, req.Username, time.Now(), userID).Scan(
-		&updatedUser.ID, &updatedUser.Username, &updatedUser.Email, &updatedUser.Password, &updatedUser.AvatarURL, &updatedUser.CreatedAt, &updatedUser.UpdatedAt,
+		&updatedUser.ID, &updatedUser.Username, &updatedUser.Email, &updatedUser.Password, &avatarURL, &updatedUser.CreatedAt, &updatedUser.UpdatedAt,
 	)
 
 	if err != nil {
@@ -205,6 +249,10 @@ func (h *Handlers) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		respondWithError(w, http.StatusInternalServerError, "Failed to update user profile")
 		return
+	}
+
+	if avatarURL.Valid {
+		updatedUser.AvatarURL = avatarURL.String
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -679,29 +727,9 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 			respondWithError(w, http.StatusInternalServerError, "Failed to send group message")
 			return
 		}
-
-		// Get all members of the group to notify them
-		rows, err := h.db.Query("SELECT user_id FROM group_members WHERE group_id = $1 AND user_id != $2", groupID, userID)
-		if err != nil {
-			log.Printf("Failed to get group members for notification: %v", err)
-		} else {
-			defer rows.Close()
-			notification := websocket.Message{Type: "new_message", Payload: message}
-			for rows.Next() {
-				var memberID string
-				if err := rows.Scan(&memberID); err == nil {
-					h.hub.SendToUser(memberID, notification)
-				}
-			}
-		}
-
 	} else {
 		// This is a direct message
 		recipientID, err := uuid.Parse(*req.RecipientID)
-		if err != nil {
-			respondWithError(w, http.StatusBadRequest, "Invalid recipient_id format")
-			return
-		}
 		message.RecipientID = &recipientID
 
 		// Insert direct message into DB
@@ -715,13 +743,12 @@ func (h *Handlers) SendMessage(w http.ResponseWriter, r *http.Request) {
 			respondWithError(w, http.StatusInternalServerError, "Failed to send message")
 			return
 		}
+	}
 
-		// Send real-time notification to recipient
-		notification := websocket.Message{
-			Type:    "new_message",
-			Payload: message,
-		}
-		h.hub.SendToUser(recipientID.String(), notification)
+	// Send real-time notification, but only if it's not a file message.
+	// File message notifications are sent by UploadAttachment after the upload is complete.
+	if message.MessageType != "file" {
+		h.notifyNewMessage(message)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1040,6 +1067,34 @@ func (h *Handlers) UploadAttachment(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to create attachment record: %v", err)
 		respondWithError(w, http.StatusInternalServerError, "Failed to create attachment record")
 		return
+	}
+
+	// 6. Fetch the full message details and broadcast the "new_message" event now that the attachment is ready.
+	var message models.Message
+	var recipientID, groupID sql.NullString
+	err = h.db.QueryRow(`
+		SELECT id, sender_id, recipient_id, group_id, encrypted_content, message_type, created_at
+		FROM messages WHERE id = $1
+	`, messageID).Scan(
+		&message.ID, &message.SenderID, &recipientID, &groupID, &message.EncryptedContent, &message.MessageType, &message.CreatedAt,
+	)
+
+	if err != nil {
+		log.Printf("Failed to fetch message for attachment notification: %v", err)
+		// The upload was successful, so we still return a success status.
+		// The recipient will get the message on the next refresh.
+	} else {
+		// Re-construct the message object with the correct UUID types for the helper
+		if groupID.Valid {
+			gid, _ := uuid.Parse(groupID.String)
+			message.GroupID = &gid
+		}
+		if recipientID.Valid {
+			rid, _ := uuid.Parse(recipientID.String)
+			message.RecipientID = &rid
+		}
+		// Send the notification
+		h.notifyNewMessage(message)
 	}
 
 	w.WriteHeader(http.StatusCreated)

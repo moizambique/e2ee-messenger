@@ -1,21 +1,23 @@
 import { Platform } from 'react-native';
 import {
-  AuthResponse, 
-  SignupRequest, 
-  LoginRequest, 
-  DeviceKey, 
-  OneTimeKey, 
-  Message, 
+  User,
+  Chat,
+  Message,
+} from '../types';
+import {
+  AuthResponse,
+  SignupRequest,
+  LoginRequest,
+  DeviceKey,
+  OneTimeKey,
   Receipt,
   SendMessageRequest,
   GetMessagesRequest,
   SendReceiptRequest,
-  User,
   UpdateProfileRequest,
-  Chat,
   CreateGroupRequest,
   ChangePasswordRequest
-} from '../types';
+} from '../types/api';
 
 export const API_BASE_URL = __DEV__ 
   ? 'http://localhost:8080/v1' 

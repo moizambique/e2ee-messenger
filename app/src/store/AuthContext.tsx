@@ -3,7 +3,7 @@ import { useAuthStore } from './authStore';
 import { useChatStore } from './chatStore';
 import { webSocketService } from '../services/websocket';
 import { apiService } from '../services/api';
-import { UpdateProfileRequest, ChangePasswordRequest } from '../types';
+import { UpdateProfileRequest, ChangePasswordRequest } from '../types/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;

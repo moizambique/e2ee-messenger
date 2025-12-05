@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, AuthResponse, UpdateProfileRequest, ChangePasswordRequest } from '../types';
+import { User } from '../types';
+import { AuthResponse, UpdateProfileRequest, ChangePasswordRequest } from '../types/api';
 import { apiService, API_BASE_URL } from '../services/api';
 import { clearAll } from '../crypto/crypto';
 
