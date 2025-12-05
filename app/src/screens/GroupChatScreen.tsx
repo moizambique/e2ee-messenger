@@ -64,6 +64,14 @@ const GroupChatScreen: React.FC = () => {
     }
   }, [error, clearError]);
 
+  const handleKeyPress = (e: any) => {
+    // This is for web support to send on Enter and make a new line on Shift+Enter
+    if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+      e.preventDefault(); // Prevent new line
+      handleSendMessage();
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageText.trim() || sending) return;
 
@@ -263,10 +271,7 @@ const GroupChatScreen: React.FC = () => {
   );
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerInfo}>
           <Avatar name={chat.name} size={40} isGroup={true} />
@@ -285,38 +290,47 @@ const GroupChatScreen: React.FC = () => {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
+        style={{ flex: 1 }}
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={messages.length === 0 ? styles.emptyContainer : styles.messagesList}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <View style={styles.inputContainer}>
-        <View style={styles.inputWrapper}>
-          <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument}>
-            <Ionicons name="attach" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.textInput}
-            value={messageText}
-            onChangeText={setMessageText}
-            placeholder={`Message ${chat.name}...`}
-            multiline
-            maxLength={1000}
-            editable={!sending}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!messageText.trim() || sending) && styles.sendButtonDisabled]}
-            onPress={handleSendMessage}
-            disabled={!messageText.trim() || sending}
-          >
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={(!messageText.trim() || sending) ? "#C7C7CC" : "#007AFF"} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={90}
+      >
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <TouchableOpacity style={styles.attachButton} onPress={handlePickDocument}>
+              <Ionicons name="attach" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.textInput}
+              value={messageText}
+              onChangeText={setMessageText}
+              placeholder={`Message ${chat.name}...`}
+              multiline
+              maxLength={1000}
+              editable={!sending}
+              onKeyPress={handleKeyPress}
             />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, (!messageText.trim() || sending) && styles.sendButtonDisabled]}
+              onPress={handleSendMessage}
+              disabled={!messageText.trim() || sending}
+            >
+              <Ionicons
+                name="send"
+                size={20}
+                color={!messageText.trim() || sending ? '#C7C7CC' : '#007AFF'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
