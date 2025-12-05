@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Chat, Message, User } from '../types';
+import { Image } from 'react-native';
+import { Chat, Message } from '../types';
 import { apiService } from '../services/api';
 import { useAuthStore } from './authStore';
 import { EncryptedMessage } from '../crypto/types';
@@ -153,11 +154,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const mockEncryptedFileKey = `encrypted_key_for_${fileName}`;
 
       // The content of a file message is a JSON string with file metadata.
-      const fileMessageContent = JSON.stringify({
+      const fileMetadata: {
+        fileName: string;
+        fileType: string;
+        width?: number;
+        height?: number;
+      } = {
         fileName,
         fileType,
-        // In a real app, you'd include the file size here.
-      });
+      };
+
+      // If it's an image, get its dimensions before sending.
+      // This avoids layout shifts on the recipient's side.
+      if (fileType.startsWith('image/')) {
+        await new Promise<void>((resolve) => {
+          Image.getSize(
+            fileUri,
+            (width, height) => {
+              fileMetadata.width = width;
+              fileMetadata.height = height;
+              resolve();
+            },
+            () => {
+              // If getSize fails, we can still send the message without dimensions.
+              resolve();
+            }
+          );
+        });
+      }
 
       // 1. Optimistically add to UI using the LOCAL file URI
       const tempMessage: Message = {
@@ -166,7 +190,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         group_id: isGroup ? targetId : undefined,
         recipient_id: isGroup ? undefined : targetId,
         // The content is the metadata, but we add the local URI for rendering
-        encrypted_content: JSON.stringify({ ...JSON.parse(fileMessageContent), localUri: fileUri }),
+        encrypted_content: JSON.stringify({ ...fileMetadata, localUri: fileUri }),
         message_type: 'file',
         created_at: new Date().toISOString(),
         status: 'sending',
@@ -177,7 +201,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const sentMessage = await apiService.sendMessage({
         recipient_id: isGroup ? undefined : targetId,
         group_id: isGroup ? targetId : undefined,
-        encrypted_content: fileMessageContent, // This is just metadata
+        encrypted_content: JSON.stringify(fileMetadata), // This is just metadata
         message_type: 'file',
       });
 

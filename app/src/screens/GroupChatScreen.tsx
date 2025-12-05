@@ -28,6 +28,41 @@ import { RootStackParamList, Message } from '../types';
 
 type GroupChatScreenRouteProp = RouteProp<RootStackParamList, 'GroupChat'>;
 
+// By defining the component outside of GroupChatScreen and wrapping it with React.memo,
+// we prevent it from being re-created on every render of the parent. This is the
+// key to stopping the image from flickering when the user is typing in the input box.
+const ImageAttachment: React.FC<{ item: Message; isOwn: boolean }> = React.memo(({ item, isOwn }) => {
+  const fileInfo = JSON.parse(item.encrypted_content);
+  const token = apiService.getToken();
+  let imageUrl: string;
+
+  // If localUri exists (during optimistic update), use it. Otherwise, build the network URL.
+  if (fileInfo.localUri) {
+    imageUrl = fileInfo.localUri;
+  } else {
+    const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
+    imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
+  }
+  const headers = Platform.OS === 'web' ? undefined : { Authorization: `Bearer ${token}` };
+
+  // Check for pre-loaded dimensions to avoid layout shifts
+  let preloadedAspectRatio: number | null = null;
+  if (fileInfo.width && fileInfo.height) {
+    preloadedAspectRatio = fileInfo.width / fileInfo.height;
+  }
+
+  // Only call the hook if we don't have the aspect ratio.
+  const fetchedAspectRatio = useImageAspectRatio(preloadedAspectRatio ? undefined : imageUrl, headers);
+  const aspectRatio = preloadedAspectRatio || fetchedAspectRatio;
+
+  const imageStyle = {
+    ...styles.imageAttachment,
+    aspectRatio: aspectRatio && aspectRatio > 0 ? aspectRatio : 1,
+  };
+  const imageSource = { uri: imageUrl, headers };
+  return <Image source={imageSource} style={[styles.messageBubble, isOwn && styles.ownMessageBubble, imageStyle]} resizeMode="contain" />;
+});
+
 const GroupChatScreen: React.FC = () => {
   const route = useRoute<GroupChatScreenRouteProp>();
   const { chat } = route.params;
@@ -141,26 +176,6 @@ const GroupChatScreen: React.FC = () => {
       console.error('Download failed:', error);
       RNAlert.alert('Download Failed', 'Could not download the attachment.');
     }
-  };
-
-  const ImageAttachment: React.FC<{ item: Message; isOwn: boolean }> = ({ item, isOwn }) => {
-    const fileInfo = JSON.parse(item.encrypted_content);    
-    const token = apiService.getToken();
-    let imageUrl: string;
-
-    // If localUri exists (during optimistic update), use it. Otherwise, build the network URL.
-    if (fileInfo.localUri) {
-      imageUrl = fileInfo.localUri;
-    } else {
-      const baseUrl = apiService.getAttachmentDownloadUrl(item.id, fileInfo.fileName);
-      imageUrl = Platform.OS === 'web' ? `${baseUrl}?token=${token}` : baseUrl;
-    }
-    const headers = Platform.OS === 'web' ? undefined : { Authorization: `Bearer ${token}` };
-    console.log('[DEBUG] GroupChat ImageAttachment: Requesting image with URL:', imageUrl);
-    const aspectRatio = useImageAspectRatio(imageUrl, headers);
-    const imageStyle = { ...styles.imageAttachment, aspectRatio: aspectRatio || 1 };
-    const imageSource = { uri: imageUrl, headers };
-    return <Image source={imageSource} style={[styles.messageBubble, isOwn && styles.ownMessageBubble, imageStyle]} resizeMode="contain" />;
   };
 
   const renderMessage = ({ item, index }: { item: Message, index: number }) => {
